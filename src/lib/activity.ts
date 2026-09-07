@@ -5,6 +5,7 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { v4 as uuidv4 } from "uuid";
+import type { Prisma } from "@prisma/client";
 
 export type ActivitySeverity = "INFO" | "SUCCESS" | "WARNING" | "ERROR";
 
@@ -28,7 +29,7 @@ export async function recordActivity(input: ActivityInput) {
       type: input.type,
       message: input.message,
       severity: input.severity || "INFO",
-      metadata: input.metadata ?? undefined,
+      metadata: (input.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
     },
   });
 }
