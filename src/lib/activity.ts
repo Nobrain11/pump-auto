@@ -6,6 +6,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { v4 as uuidv4 } from "uuid";
 import type { Prisma } from "@prisma/client";
+import { notifyUserByTelegram, shouldNotify } from "@/lib/telegram/notify";
 
 export type ActivitySeverity = "INFO" | "SUCCESS" | "WARNING" | "ERROR";
 
@@ -20,7 +21,7 @@ export interface ActivityInput {
 }
 
 export async function recordActivity(input: ActivityInput) {
-  return prisma.activityEvent.create({
+  const event = await prisma.activityEvent.create({
     data: {
       id: uuidv4(),
       userId: input.userId,
@@ -32,6 +33,15 @@ export async function recordActivity(input: ActivityInput) {
       metadata: (input.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
     },
   });
+
+  const severity = input.severity || "INFO";
+  if (input.userId && shouldNotify(input.type, severity)) {
+    const icon = severity === "ERROR" ? "🔴" : severity === "WARNING" ? "🟡" : "🟢";
+    // Fire-and-forget: never let a Telegram failure affect activity recording.
+    void notifyUserByTelegram(input.userId, `${icon} ${input.message}`);
+  }
+
+  return event;
 }
 
 export async function listActivity(userId: string, limit = 50) {
