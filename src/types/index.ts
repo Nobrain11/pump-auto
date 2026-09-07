@@ -51,7 +51,7 @@ export interface TokenScoreBreakdown {
   safety: number;
   marketFit: number;
   risk: RiskLevel;
-  components: Record<string, number | string | boolean>;
+  components: Record<string, number | string | boolean | null>;
   computedAt: string;
 }
 
