@@ -154,6 +154,34 @@ export interface SwapProvider {
   getStatus(signature: string): Promise<"PENDING" | "CONFIRMED" | "FAILED">;
 }
 
+export interface LeaderboardTrader {
+  id: string;
+  name: string;
+  verified: boolean;
+  roiPct: number;
+  realizedPnlSol: number;
+  unrealizedPnlSol: number;
+  winRatePct: number;
+  trades: number;
+  volumeSol: number;
+  followers: number;
+  risk: RiskLevel;
+  confidence: Confidence;
+  sampleSize: number;
+}
+
+export interface CopyTradeConfiguration {
+  traderId: string;
+  mode: "fixed" | "percent";
+  amount: number;
+  maxPositions: number;
+  maxDailyExposure?: number;
+  minLiquidity?: number;
+  minTokenScore?: number;
+  risk: RiskLevel;
+  slippageBps?: number;
+}
+
 export interface SolanaProvider {
   getBalance(publicKey: string): Promise<number>;
   getTokenAccounts(publicKey: string): Promise<{ mint: string; amount: string; uiAmount: number }[]>;
