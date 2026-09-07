@@ -9,6 +9,14 @@ The web app only serves UI + API. Automated trading needs the **bot process**.
 
 ## Railway (recommended)
 
+Before the first deployment, initialize the shared Railway Postgres database from a service with `DATABASE_URL` configured:
+
+```bash
+npm run db:deploy
+```
+
+Keep this as a separate release step. The web build only generates Prisma Client and compiles Next.js, so builds do not require database connectivity.
+
 1. In the same project as the web app, **New Service** → **GitHub Repo** → same `pump-auto` repo.
 2. Name it e.g. `pump-auto-bot`.
 3. **Settings → Deploy**
