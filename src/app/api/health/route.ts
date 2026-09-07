@@ -10,6 +10,8 @@ export async function GET() {
     solanaRpc: "missing",
     encryptionKey: process.env.WALLET_ENCRYPTION_KEY ? "ok" : "missing",
     authSecret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET ? "ok" : "missing",
+    telegramToken: process.env.TELEGRAM_BOT_TOKEN ? "ok" : "missing",
+    telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ? "ok" : "missing",
   };
 
   try {

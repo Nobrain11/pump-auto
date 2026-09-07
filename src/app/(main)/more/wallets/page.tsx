@@ -16,6 +16,7 @@ interface WalletView {
 export default function WalletsPage() {
   const [wallets, setWallets] = useState<WalletView[]>([]);
   const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -38,7 +39,8 @@ export default function WalletsPage() {
   }, [load]);
 
   const create = async () => {
-    setLoading(true);
+    setCreating(true);
+    setError(null);
     try {
       const res = await fetch("/api/wallets", {
         method: "POST",
@@ -51,7 +53,7 @@ export default function WalletsPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Create failed");
     } finally {
-      setLoading(false);
+      setCreating(false);
     }
   };
 
@@ -99,8 +101,8 @@ export default function WalletsPage() {
           </div>
         )}
 
-        <Button size="lg" onClick={create} disabled={loading}>
-          {loading ? "…" : "+ Add Wallet"}
+        <Button size="lg" onClick={create} disabled={loading || creating}>
+          {creating ? "Creating…" : "+ Add Wallet"}
         </Button>
       </div>
 

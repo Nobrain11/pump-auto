@@ -45,6 +45,26 @@ const CreateSchema = z.object({
   name: z.string().min(1).max(64).optional(),
 });
 
+function walletErrorResponse(err: unknown) {
+  const message = err instanceof Error ? err.message : "Unknown error";
+  const safeMessage = redactSecrets(message);
+  console.error("[wallets] POST failed:", safeMessage);
+
+  if (safeMessage.includes("WALLET_ENCRYPTION_KEY")) {
+    return NextResponse.json(
+      { error: "Wallet encryption is not configured. Set WALLET_ENCRYPTION_KEY in the deployment environment." },
+      { status: 503 }
+    );
+  }
+  if (safeMessage.includes("DATABASE_URL") || safeMessage.includes("Prisma") || safeMessage.includes("database")) {
+    return NextResponse.json(
+      { error: "Wallet storage is unavailable. Check the database configuration and try again." },
+      { status: 503 }
+    );
+  }
+  return NextResponse.json({ error: "Failed to create wallet. Check the server logs for details." }, { status: 500 });
+}
+
 export async function POST(req: NextRequest) {
   try {
     let user = await getCurrentUser();
@@ -72,8 +92,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ wallet }, { status: 201 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("[wallets] POST failed:", redactSecrets(message));
-    return NextResponse.json({ error: "Failed to create wallet" }, { status: 500 });
+    return walletErrorResponse(err);
   }
 }

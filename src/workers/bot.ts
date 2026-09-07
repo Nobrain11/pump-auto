@@ -273,6 +273,9 @@ async function main() {
   if (!process.env.SOLANA_RPC_URL && !process.env.HELIUS_RPC_URL)
     missing.push("SOLANA_RPC_URL|HELIUS_RPC_URL");
   if (!process.env.WALLET_ENCRYPTION_KEY) missing.push("WALLET_ENCRYPTION_KEY");
+  if (!process.env.TELEGRAM_BOT_TOKEN) {
+    console.warn("[bot] TELEGRAM_BOT_TOKEN is not configured; Telegram commands require the web webhook route and token.");
+  }
   if (missing.length) {
     console.warn("[bot] missing env (some features will fail):", missing.join(", "));
   }
