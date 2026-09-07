@@ -4,6 +4,8 @@ import Link from "next/link";
 import { BottomNav } from "@/components/layout/bottom-nav";
 
 const links = [
+  { href: "/more/leaderboard", label: "Leaderboard", desc: "Discover verified traders" },
+  { href: "/more/copy-trade", label: "Copy Trade", desc: "Manage copied strategies" },
   { href: "/more/smart-devs", label: "Smart Devs", desc: "Follow proven developers" },
   { href: "/more/wallets", label: "Wallets", desc: "Manage trading wallets" },
   { href: "/more/alerts", label: "Alerts", desc: "Notifications & thresholds" },
