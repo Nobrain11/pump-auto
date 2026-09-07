@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendMessage, answerCallbackQuery } from "@/lib/telegram/client";
 import { routeCommand } from "@/lib/telegram/commands";
+import { recordEvent } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
@@ -34,18 +35,24 @@ export async function POST(req: NextRequest) {
   try {
     if (update.message?.text && update.message.chat?.id != null) {
       const chatId = String(update.message.chat.id);
-      const result = await routeCommand(chatId, update.message.text);
-      await sendMessage(chatId, result.text, {
-        replyMarkup: result.keyboard ? { inline_keyboard: result.keyboard } : undefined,
-      });
+      const isNew = await recordEvent({ type: "telegram.command", chatId, text: update.message.text });
+      if (isNew) {
+        const result = await routeCommand(chatId, update.message.text);
+        await sendMessage(chatId, result.text, {
+          replyMarkup: result.keyboard ? { inline_keyboard: result.keyboard } : undefined,
+        });
+      }
     } else if (update.callback_query) {
       const chatId = update.callback_query.message?.chat?.id;
       await answerCallbackQuery(update.callback_query.id);
       if (chatId != null && update.callback_query.data) {
-        const result = await routeCommand(String(chatId), update.callback_query.data);
-        await sendMessage(String(chatId), result.text, {
-          replyMarkup: result.keyboard ? { inline_keyboard: result.keyboard } : undefined,
-        });
+        const isNew = await recordEvent({ type: "telegram.callback", chatId: String(chatId), action: update.callback_query.data });
+        if (isNew) {
+          const result = await routeCommand(String(chatId), update.callback_query.data);
+          await sendMessage(String(chatId), result.text, {
+            replyMarkup: result.keyboard ? { inline_keyboard: result.keyboard } : undefined,
+          });
+        }
       }
     }
   } catch (err) {

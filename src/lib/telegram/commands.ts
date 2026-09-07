@@ -12,6 +12,7 @@ import { orderService } from "@/lib/orders/order-service";
 import { riskEngine, type RiskContext } from "@/engines/risk-engine";
 import { recordActivity } from "@/lib/activity";
 import type { InlineKeyboardButton } from "@/lib/telegram/client";
+import { recordEvent, queueEvent } from "@/lib/events";
 
 export interface CommandResult {
   text: string;
@@ -156,7 +157,21 @@ async function handleCallback(chatId: string, action: string): Promise<CommandRe
   if (action === "menu:positions") return handlePositions(user.id);
   if (action === "menu:portfolio") return handlePortfolio(user.id);
   if (action === "menu:activity") return handleActivity(user.id);
-  if (action === "menu:stop") return handleEmergencyStop(user.id, true);
+  if (action === "menu:wallet") return handleBalance(user.id, user.wallets);
+  if (action === "menu:settings") return {
+    text: "*SETTINGS*\n\nWallet and Telegram linking are managed securely in the web terminal.\n\nUse /unlink to disconnect this chat.",
+    keyboard: keyboard([button("HELP", "menu:help"), button("EMERGENCY STOP", "menu:stop")]),
+  };
+  if (action === "menu:devs" || action === "menu:money") return {
+    text: "This intelligence feed is available from the web terminal. Use HUNT to open the scanner workflow.",
+    keyboard: keyboard([button("HUNT", "menu:hunt"), button("BACK", "menu:help")]),
+  };
+  if (action === "menu:help") return handleHelp();
+  if (action === "menu:stop") return {
+    text: "Emergency stop blocks new automated entries and leaves existing positions untouched. Confirm to continue.",
+    keyboard: keyboard([button("CONFIRM STOP", "action:stop:confirm"), button("CANCEL", "menu:help")]),
+  };
+  if (action === "action:stop:confirm") return handleEmergencyStop(user.id, true);
   if (action === "menu:trade") return { text: "*MANUAL TRADE*\n\nSend `/buy TOKEN_MINT AMOUNT_SOL` to submit a risk-checked order.\n\nExample: `/buy MINT 0.25`" };
   return handleHelp();
 }
@@ -227,6 +242,7 @@ async function handleBuy(user: LinkedUser, args: string[]): Promise<CommandResul
   if (!risk.approved) {
     return { text: `🚫 *Trade blocked*\n${risk.reason}` };
   }
+  await queueEvent("trade-intents", { type: "trade.intent", userId: user.id, orderId: order.id });
   return {
     text: `✅ Order approved and queued.\n${amountSol} SOL → \`${mint}\`\nOrder: \`${order.id.slice(0, 8)}\`\n\nExecution + confirmation will be pushed here.`,
   };
@@ -301,6 +317,7 @@ async function handleHunter(userId: string, args: string[]): Promise<CommandResu
         data: { id: uuidv4(), userId, state: "SCANNING", startedAt: new Date() },
       });
     }
+    await recordEvent({ type: "hunter.state", userId, state: "SCANNING" });
     return { text: "▶️ Auto-Hunter starting…" };
   }
 
@@ -324,6 +341,7 @@ async function handleEmergencyStop(userId: string, engage: boolean): Promise<Com
     data: { emergencyStop: engage, state: engage ? "RISK_HALTED" : "OFF" },
   });
 
+  await recordEvent({ type: "emergency.stop", userId, enabled: engage });
   await recordActivity({
     userId,
     type: engage ? "EMERGENCY_STOP" : "EMERGENCY_STOP_CLEARED",
@@ -361,7 +379,7 @@ async function handleUnlink(chatId: string): Promise<CommandResult> {
 
 export async function routeCommand(chatId: string, rawText: string): Promise<CommandResult> {
   const text = rawText.trim();
-  if (text.startsWith("onboard:") || text.startsWith("menu:")) {
+  if (text.startsWith("onboard:") || text.startsWith("menu:") || text.startsWith("action:")) {
     return handleCallback(chatId, text);
   }
   const [cmdRaw, ...args] = text.split(/\s+/);
