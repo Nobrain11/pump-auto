@@ -32,3 +32,4 @@ export async function GET(req: NextRequest) {
   const info = await getWebhookInfo();
 
   return NextResponse.json({ registered: webhookUrl, info });
+}
