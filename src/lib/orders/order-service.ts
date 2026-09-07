@@ -4,7 +4,7 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, OrderState } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { riskEngine, type RiskContext } from "@/engines/risk-engine";
 import { recordActivity } from "@/lib/activity";
@@ -76,7 +76,7 @@ export class OrderService {
 
   async transition(
     orderId: string,
-    to: string,
+    to: OrderState,
     extra?: {
       signature?: string;
       errorMessage?: string;
