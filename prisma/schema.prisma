@@ -18,6 +18,10 @@ model User {
   updatedAt     DateTime  @updatedAt
   lastLoginAt   DateTime?
 
+  telegramChatId   String?   @unique
+  telegramLinkCode String?   @unique
+  telegramLinkedAt DateTime?
+
   profile       Profile?
   wallets       Wallet[]
   strategies    Strategy[]
