@@ -35,13 +35,17 @@ export async function POST(req: NextRequest) {
     if (update.message?.text && update.message.chat?.id != null) {
       const chatId = String(update.message.chat.id);
       const result = await routeCommand(chatId, update.message.text);
-      await sendMessage(chatId, result.text);
+      await sendMessage(chatId, result.text, {
+        replyMarkup: result.keyboard ? { inline_keyboard: result.keyboard } : undefined,
+      });
     } else if (update.callback_query) {
       const chatId = update.callback_query.message?.chat?.id;
       await answerCallbackQuery(update.callback_query.id);
       if (chatId != null && update.callback_query.data) {
         const result = await routeCommand(String(chatId), update.callback_query.data);
-        await sendMessage(String(chatId), result.text);
+        await sendMessage(String(chatId), result.text, {
+          replyMarkup: result.keyboard ? { inline_keyboard: result.keyboard } : undefined,
+        });
       }
     }
   } catch (err) {

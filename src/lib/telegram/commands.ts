@@ -11,10 +11,15 @@ import { positionService } from "@/lib/positions/position-service";
 import { orderService } from "@/lib/orders/order-service";
 import { riskEngine, type RiskContext } from "@/engines/risk-engine";
 import { recordActivity } from "@/lib/activity";
+import type { InlineKeyboardButton } from "@/lib/telegram/client";
 
 export interface CommandResult {
   text: string;
+  keyboard?: InlineKeyboardButton[][];
 }
+
+const keyboard = (...rows: InlineKeyboardButton[][]): InlineKeyboardButton[][] => rows;
+const button = (text: string, callback_data: string): InlineKeyboardButton => ({ text, callback_data });
 
 async function getLinkedUser(chatId: string) {
   return prisma.user.findUnique({
@@ -81,10 +86,13 @@ async function handleStart(chatId: string, payload: string | undefined): Promise
   }
   return {
     text:
-      "*PUMP AUTO*\nSolana automated trading terminal.\n\n" +
-      "Link your account first:\n`/link YOUR_CODE`\n\n" +
-      "Get a code from the app: Settings → Telegram.\n\n" +
-      "Once linked, send /help to see what I can do.",
+      "*PUMP AUTO SOLANA TRADING TERMINAL*\n\n" +
+      "Fund your wallet. Find opportunities. Trade automatically.\n\n" +
+      "Before continuing, review terms and security.",
+    keyboard: keyboard([
+      button("CREATE WALLET", "onboard:create"),
+      button("IMPORT WALLET", "onboard:import"),
+    ], [button("TERMS & SECURITY", "onboard:terms")]),
   };
 }
 
@@ -121,20 +129,36 @@ async function handleLink(chatId: string, code: string): Promise<CommandResult> 
 
 async function handleHelp(): Promise<CommandResult> {
   return {
-    text:
-      "*Commands*\n\n" +
-      "/balance — wallet balances\n" +
-      "/portfolio — PnL summary\n" +
-      "/positions — open positions\n" +
-      "/buy MINT AMOUNT — buy AMOUNT SOL of MINT\n" +
-      "/sell MINT PERCENT — sell PERCENT% of a position\n" +
-      "/hunter — auto-hunter status\n" +
-      "/hunter start | stop — toggle auto-hunter\n" +
-      "/stop — 🛑 emergency stop (blocks new automated entries)\n" +
-      "/resume — clear emergency stop\n" +
-      "/activity — recent activity\n" +
-      "/unlink — unlink this Telegram account",
+    text: "*PUMP AUTO · SYSTEM ONLINE*\n\nFUND → HUNT → ANALYZE → TRADE → MONITOR → EXIT\n\nChoose an action:",
+    keyboard: keyboard(
+      [button("HUNT", "menu:hunt"), button("TRADE", "menu:trade"), button("POSITIONS", "menu:positions")],
+      [button("SMART DEVS", "menu:devs"), button("SMART MONEY", "menu:money")],
+      [button("PORTFOLIO", "menu:portfolio"), button("ACTIVITY", "menu:activity")],
+      [button("WALLET", "menu:wallet"), button("SETTINGS", "menu:settings")],
+      [button("EMERGENCY STOP", "menu:stop")],
+    ),
   };
+}
+
+async function handleCallback(chatId: string, action: string): Promise<CommandResult> {
+  if (action === "onboard:terms") return {
+    text: "*BEFORE YOU START*\n\nPUMP AUTO is a non-custodial trading terminal. Never share your seed phrase, private key, or recovery phrase. PUMP AUTO will never ask for these through Telegram.",
+    keyboard: keyboard([button("ACCEPT & CONTINUE", "onboard:accepted")]),
+  };
+  if (action === "onboard:create" || action === "onboard:import") return {
+    text: action.endsWith("create") ? "*CREATE WALLET*\n\nWallet creation is handled securely in the web terminal. Open Settings → Wallets to create and encrypt a wallet, then return here and send /link CODE." : "*IMPORT WALLET*\n\nImport is handled securely in the web terminal. Credentials are encrypted immediately and never logged. Open Settings → Wallets, then return here and send /link CODE.",
+    keyboard: keyboard([button("TERMS & SECURITY", "onboard:terms")]),
+  };
+  if (action === "onboard:accepted") return handleStart(chatId, undefined);
+  const user = await getLinkedUser(chatId);
+  if (!user) return { text: NOT_LINKED };
+  if (action === "menu:hunt") return handleHunter(user.id, []);
+  if (action === "menu:positions") return handlePositions(user.id);
+  if (action === "menu:portfolio") return handlePortfolio(user.id);
+  if (action === "menu:activity") return handleActivity(user.id);
+  if (action === "menu:stop") return handleEmergencyStop(user.id, true);
+  if (action === "menu:trade") return { text: "*MANUAL TRADE*\n\nSend `/buy TOKEN_MINT AMOUNT_SOL` to submit a risk-checked order.\n\nExample: `/buy MINT 0.25`" };
+  return handleHelp();
 }
 
 async function handleBalance(userId: string, wallets: LinkedWallet[]): Promise<CommandResult> {
@@ -337,6 +361,9 @@ async function handleUnlink(chatId: string): Promise<CommandResult> {
 
 export async function routeCommand(chatId: string, rawText: string): Promise<CommandResult> {
   const text = rawText.trim();
+  if (text.startsWith("onboard:") || text.startsWith("menu:")) {
+    return handleCallback(chatId, text);
+  }
   const [cmdRaw, ...args] = text.split(/\s+/);
   const cmd = cmdRaw.toLowerCase().replace(/@\w+$/, ""); // strip @BotName in group chats
 
