@@ -16,8 +16,8 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "PUMP AUTO — Solana Trading Terminal",
-  description: "Next-generation Solana automated trading terminal. Fund. Hunt. Trade.",
-  manifest: "/manifest.json",
+  description: "Fund. Hunt. Trade. Professional Solana automated trading terminal.",
+  icons: { icon: "/favicon.svg" },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#050507",
+  themeColor: "#07070a",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -40,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full bg-background antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
