@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -12,16 +12,24 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "PUMP AUTO — Solana Trading Terminal",
   description: "Next-generation Solana automated trading terminal. Fund. Hunt. Trade.",
   manifest: "/manifest.json",
-  themeColor: "#050507",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "PUMP AUTO",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#050507",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
