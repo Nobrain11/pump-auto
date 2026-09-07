@@ -4,6 +4,7 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { riskEngine, type RiskContext } from "@/engines/risk-engine";
 import { recordActivity } from "@/lib/activity";
@@ -65,7 +66,7 @@ export class OrderService {
           userId: input.userId,
           type: "ORDER_BLOCKED",
           reason: risk.reason || "Risk engine rejected",
-          metadata: { orderId, checks: risk.checks },
+          metadata: { orderId, checks: risk.checks } as Prisma.InputJsonValue,
         },
       });
     }
@@ -79,16 +80,16 @@ export class OrderService {
     extra?: {
       signature?: string;
       errorMessage?: string;
-      quote?: object;
+      quote?: Prisma.InputJsonValue;
     }
   ) {
-    const data: Record<string, unknown> = {
+    const data: Prisma.OrderUpdateInput = {
       state: to,
       updatedAt: new Date(),
     };
     if (extra?.signature) data.signature = extra.signature;
     if (extra?.errorMessage) data.errorMessage = extra.errorMessage;
-    if (extra?.quote) data.quote = extra.quote;
+    if (extra?.quote !== undefined) data.quote = extra.quote;
     if (to === "SUBMITTED") data.submittedAt = new Date();
     if (to === "CONFIRMED") data.confirmedAt = new Date();
 
