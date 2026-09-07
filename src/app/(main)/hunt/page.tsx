@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { Brand } from "@/components/layout/brand";
 import { Button } from "@/components/ui/button";
+import { TokenCard } from "@/components/trading/token-card";
 
 interface Opportunity {
   mint: string;
@@ -10,7 +12,7 @@ interface Opportunity {
   name?: string;
   score: number;
   risk: string;
-  breakdown: Record<string, number>;
+  breakdown?: Record<string, number>;
   liquidityUsd: number | null;
   volume24hUsd: number | null;
   priceUsd: number | null;
@@ -32,9 +34,7 @@ export default function HuntPage() {
     try {
       const res = await fetch("/api/scanner");
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || data.error || "Scanner failed");
-      }
+      if (!res.ok) throw new Error(data.detail || data.error || "Scanner failed");
       setOpps(data.opportunities || []);
       setScannedAt(data.scannedAt);
       setStats({
@@ -53,94 +53,69 @@ export default function HuntPage() {
     scan();
   }, [scan]);
 
-  const riskColor = (r: string) => {
-    if (r === "LOW") return "text-[var(--success)]";
-    if (r === "MEDIUM") return "text-[var(--warning)]";
-    return "text-[var(--danger)]";
-  };
-
   return (
-    <main className="min-h-dvh flex flex-col pb-20">
-      <header className="px-5 pt-6 pb-4 border-b border-[var(--card-border)] flex justify-between items-end">
-        <div>
-          <p className="text-[10px] font-mono tracking-widest text-[var(--muted)] uppercase">
-            Scanner
-          </p>
-          <h1 className="text-lg font-bold text-white">Hunt</h1>
+    <main className="min-h-dvh flex flex-col pb-16">
+      <header className="px-4 pt-4 pb-3 border-b border-[var(--card-border)] flex items-center justify-between gap-3">
+        <Brand compact />
+        <div className="flex-1">
+          <p className="label">Scanner</p>
+          <h1 className="text-sm font-semibold text-white">Hunt</h1>
         </div>
-        <Button size="sm" variant="secondary" onClick={scan} disabled={loading}>
-          {loading ? "Scanning…" : "Refresh"}
+        <Button size="xs" variant="secondary" onClick={scan} disabled={loading}>
+          {loading ? "…" : "Refresh"}
         </Button>
       </header>
 
-      <div className="flex-1 px-5 py-4 max-w-lg mx-auto w-full space-y-4">
+      <div className="flex-1 px-4 py-3 max-w-lg mx-auto w-full space-y-3">
         <div className="grid grid-cols-3 gap-2">
-          {["total", "passed", "rejected"].map((k) => (
-            <div
-              key={k}
-              className="rounded-xl border border-[var(--card-border)] bg-[var(--card)] p-3 text-center"
-            >
-              <p className="text-lg font-mono font-semibold text-white">
-                {stats[k as keyof typeof stats]}
-              </p>
-              <p className="text-[10px] text-[var(--muted)] uppercase">{k}</p>
+          {[
+            ["Detected", stats.total],
+            ["Passed", stats.passed],
+            ["Filtered", stats.rejected],
+          ].map(([k, v]) => (
+            <div key={String(k)} className="panel px-2.5 py-2 text-center">
+              <p className="text-sm mono font-semibold text-white">{v}</p>
+              <p className="label mt-0.5">{k}</p>
             </div>
           ))}
         </div>
 
         {scannedAt && (
-          <p className="text-[10px] font-mono text-[var(--muted)]">
-            Last scan: {new Date(scannedAt).toLocaleTimeString()}
+          <p className="text-[10px] mono text-[var(--muted)]">
+            Last scan {new Date(scannedAt).toLocaleTimeString()}
           </p>
         )}
 
         {error && (
-          <div className="rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">
+          <div className="panel border-[var(--danger)]/40 px-3 py-2 text-xs text-[var(--danger)]">
             {error}
-            <p className="text-[10px] mt-1 opacity-80">
-              No mock data shown. Fix market data / RPC connectivity.
-            </p>
+            <p className="text-[10px] mt-1 opacity-80">No mock data. Fix market data / RPC.</p>
           </div>
         )}
 
         <div className="space-y-2">
           {opps.map((o) => (
-            <div
+            <TokenCard
               key={o.mint}
-              className={`rounded-xl border bg-[var(--card)] p-4 ${
-                o.passedFilters
-                  ? "border-[var(--primary)]/30"
-                  : "border-[var(--card-border)] opacity-70"
-              }`}
-            >
-              <div className="flex justify-between items-start gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">
-                    {o.symbol || o.mint.slice(0, 8)}
-                    {o.name && (
-                      <span className="text-[var(--muted)] font-normal"> · {o.name}</span>
-                    )}
-                  </p>
-                  <p className="text-[10px] font-mono text-[var(--muted)] truncate">
-                    {o.mint}
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-lg font-mono font-bold text-white">{o.score}</p>
-                  <p className={`text-[10px] font-mono ${riskColor(o.risk)}`}>{o.risk}</p>
-                </div>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-[var(--muted)] font-mono">
-                {o.liquidityUsd != null && <span>Liq ${Math.round(o.liquidityUsd).toLocaleString()}</span>}
-                {o.volume24hUsd != null && <span>Vol ${Math.round(o.volume24hUsd).toLocaleString()}</span>}
-              </div>
-              {!o.passedFilters && o.rejectReasons.length > 0 && (
-                <p className="mt-2 text-[10px] text-[var(--warning)]">
-                  {o.rejectReasons.join(" · ")}
-                </p>
-              )}
-            </div>
+              mint={o.mint}
+              symbol={o.symbol}
+              name={o.name}
+              liquidityUsd={o.liquidityUsd}
+              volume24hUsd={o.volume24hUsd}
+              score={o.score}
+              risk={o.risk}
+              devScore={o.breakdown?.dev}
+              flowScore={o.breakdown?.flow}
+              momentumScore={o.breakdown?.momentum}
+              passedFilters={o.passedFilters}
+              rejectReasons={o.rejectReasons}
+            />
           ))}
+          {!loading && opps.length === 0 && !error && (
+            <div className="panel p-6 text-center text-xs text-[var(--muted)]">
+              No opportunities yet. Scanner uses live market data only.
+            </div>
+          )}
         </div>
       </div>
 
