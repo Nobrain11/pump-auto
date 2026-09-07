@@ -1,0 +1,579 @@
+// PUMP AUTO - PostgreSQL Schema
+// Production relational model for wallets, strategies, positions, intelligence, risk, activity
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String?   @unique
+  username      String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+
+  profile       Profile?
+  wallets       Wallet[]
+  strategies    Strategy[]
+  hunterSessions HunterSession[]
+  positions     Position[]
+  orders        Order[]
+  activityEvents ActivityEvent[]
+  notifications Notification[]
+  alerts        Alert[]
+  referralsMade Referral[] @relation("Referrer")
+  referralReceived Referral? @relation("Referred")
+  supportTickets SupportTicket[]
+  auditLogs     AuditLog[]
+  sessions      Session[]
+  developerFollows DeveloperFollow[]
+  portfolioSnapshots PortfolioSnapshot[]
+  riskEvents    RiskEvent[]
+
+  @@index([email])
+  @@index([username])
+}
+
+model Profile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName String?
+  avatarUrl   String?
+  timezone    String   @default("UTC")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String
+  expiresAt    DateTime
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+}
+
+model Wallet {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  publicKey   String
+  isPrimary   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  encryptedSecret EncryptedWalletSecret?
+  balances    WalletBalance[]
+  positions   Position[]
+  orders      Order[]
+  transactions Transaction[]
+  strategySettings StrategySetting[]
+  riskSettings WalletRiskSetting?
+  activityEvents ActivityEvent[]
+
+  @@unique([userId, publicKey])
+  @@index([userId])
+  @@index([publicKey])
+}
+
+model EncryptedWalletSecret {
+  id          String   @id @default(uuid())
+  walletId    String   @unique
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  ciphertext  String
+  iv          String
+  authTag     String
+  keyVersion  Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WalletBalance {
+  id          String   @id @default(uuid())
+  walletId    String
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  mint        String
+  amount      Decimal  @db.Decimal(36, 18)
+  uiAmount    Decimal  @db.Decimal(36, 18)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([walletId, mint])
+  @@index([walletId])
+}
+
+model WalletRiskSetting {
+  id                    String   @id @default(uuid())
+  walletId              String   @unique
+  wallet                Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  maxDailyLossSol       Decimal  @db.Decimal(18, 9) @default(1)
+  maxPerTradeSol        Decimal  @db.Decimal(18, 9) @default(0.5)
+  maxWalletExposureSol  Decimal  @db.Decimal(18, 9) @default(5)
+  maxConcurrentPositions Int     @default(5)
+  maxSlippageBps        Int      @default(300)
+  cooldownSeconds       Int      @default(60)
+  emergencyStop         Boolean  @default(false)
+  updatedAt             DateTime @updatedAt
+}
+
+enum StrategyType {
+  AUTO_HUNTER
+  SMART_DEV_FOLLOW
+  MANUAL
+  MOMENTUM
+  SNIPER
+  BREAKOUT
+  MEAN_REVERSION
+  DCA
+  COPY_TRADING
+  CUSTOM
+}
+
+model Strategy {
+  id          String       @id @default(uuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        StrategyType
+  name        String
+  isActive    Boolean      @default(true)
+  config      Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  settings    StrategySetting[]
+  hunterSessions HunterSession[]
+  orders      Order[]
+  positions   Position[]
+
+  @@index([userId])
+  @@index([type])
+}
+
+model StrategySetting {
+  id          String   @id @default(uuid())
+  strategyId  String
+  strategy    Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  walletId    String?
+  wallet      Wallet?  @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  key         String
+  value       Json
+  updatedAt   DateTime @updatedAt
+
+  @@index([strategyId])
+}
+
+enum HunterState {
+  OFF
+  STARTING
+  SCANNING
+  ANALYZING
+  READY
+  EXECUTING
+  MONITORING
+  PAUSED
+  RISK_HALTED
+  ERROR
+}
+
+model HunterSession {
+  id              String      @id @default(uuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategyId      String?
+  strategy        Strategy?   @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  state           HunterState @default(OFF)
+  marketRegime    String      @default("UNKNOWN")
+  opportunitiesFound Int      @default(0)
+  passedFilters   Int         @default(0)
+  positions       Int         @default(0)
+  entriesToday    Int         @default(0)
+  dailyRiskUsedPct Float      @default(0)
+  emergencyStop   Boolean     @default(false)
+  startedAt       DateTime?
+  lastTickAt      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([state])
+}
+
+model ScannerToken {
+  id            String   @id @default(uuid())
+  mint          String   @unique
+  symbol        String?
+  name          String?
+  creatorAddress String?
+  source        String
+  discoveredAt  DateTime @default(now())
+  metadata      Json?
+
+  scores        TokenScore[]
+
+  @@index([discoveredAt])
+  @@index([creatorAddress])
+}
+
+model TokenScore {
+  id            String   @id @default(uuid())
+  scannerTokenId String?
+  scannerToken  ScannerToken? @relation(fields: [scannerTokenId], references: [id], onDelete: SetNull)
+  mint          String
+  overall       Int
+  dev           Int
+  liquidity     Int
+  flow          Int
+  momentum      Int
+  holderQuality Int
+  safety        Int
+  marketFit     Int
+  risk          String
+  components    Json?
+  computedAt    DateTime @default(now())
+
+  @@index([mint])
+  @@index([overall])
+  @@index([computedAt])
+}
+
+model Developer {
+  id                      String   @id @default(uuid())
+  address                 String   @unique
+  totalLaunches           Int      @default(0)
+  graduatedCount          Int      @default(0)
+  abandonedCount          Int      @default(0)
+  activeCount             Int      @default(0)
+  medianSurvivalSeconds   Int?
+  medianPeakMultiple      Decimal? @db.Decimal(18, 6)
+  successfulLaunchRatio   Decimal? @db.Decimal(8, 6)
+  sampleSize              Int      @default(0)
+  confidence              String   @default("LOW")
+  riskIndicators          String[]
+  lastLaunchAt            DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  scores                  DeveloperScore[]
+  launches                DeveloperLaunch[]
+  follows                 DeveloperFollow[]
+
+  @@index([confidence])
+}
+
+model DeveloperScore {
+  id            String    @id @default(uuid())
+  developerId   String
+  developer     Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  score         Int
+  confidence    String
+  components    Json?
+  computedAt    DateTime  @default(now())
+
+  @@index([developerId])
+  @@index([computedAt])
+}
+
+model DeveloperLaunch {
+  id            String    @id @default(uuid())
+  developerId   String
+  developer     Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  mint          String
+  launchedAt    DateTime
+  outcome       String?
+  peakMultiple  Decimal?  @db.Decimal(18, 6)
+  survivalSeconds Int?
+  metadata      Json?
+
+  @@index([developerId])
+  @@index([mint])
+}
+
+model DeveloperFollow {
+  id                  String    @id @default(uuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  developerId         String
+  developer           Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  tradeAmountSol      Decimal   @db.Decimal(18, 9) @default(0.25)
+  minDevScore         Int       @default(70)
+  maxPositions        Int       @default(2)
+  maxDailyExposureSol Decimal   @db.Decimal(18, 9) @default(1)
+  minLiquidityUsd     Decimal   @db.Decimal(18, 2) @default(10000)
+  cooldownSeconds     Int       @default(1800)
+  autoBuy             Boolean   @default(false)
+  alertsEnabled       Boolean   @default(true)
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([userId, developerId])
+  @@index([userId])
+}
+
+enum OrderState {
+  CREATED
+  RISK_CHECK
+  APPROVED
+  BUILDING
+  SIGNED
+  SUBMITTED
+  CONFIRMING
+  CONFIRMED
+  FAILED
+  CANCELLED
+}
+
+model Order {
+  id              String     @id @default(uuid())
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletId        String
+  wallet          Wallet     @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  strategyId      String?
+  strategy        Strategy?  @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  tokenId         String?
+  mint            String
+  side            String
+  amountSol       Decimal    @db.Decimal(18, 9)
+  state           OrderState @default(CREATED)
+  riskApproved    Boolean    @default(false)
+  riskReason      String?
+  slippageBps     Int?
+  signature       String?
+  errorMessage    String?
+  quote           Json?
+  idempotencyKey  String     @unique
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  submittedAt     DateTime?
+  confirmedAt     DateTime?
+
+  position        Position?
+  executions      Execution[]
+
+  @@index([userId])
+  @@index([state])
+  @@index([mint])
+  @@index([createdAt])
+}
+
+model Execution {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  phase       String
+  signature   String?
+  detail      Json?
+  createdAt   DateTime @default(now())
+
+  @@index([orderId])
+}
+
+model Position {
+  id                  String   @id @default(uuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletId            String
+  wallet              Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  orderId             String?  @unique
+  order               Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  strategyId          String?
+  strategy            Strategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  tokenId             String?
+  mint                String
+  entryPriceUsd       Decimal  @db.Decimal(36, 18)
+  entryAmountSol      Decimal  @db.Decimal(18, 9)
+  entryAmountToken    Decimal  @db.Decimal(36, 18)
+  currentAmountToken  Decimal  @db.Decimal(36, 18)
+  realizedPnlSol      Decimal  @db.Decimal(18, 9) @default(0)
+  unrealizedPnlSol    Decimal  @db.Decimal(18, 9) @default(0)
+  highestPnlPct       Decimal  @db.Decimal(18, 6) @default(0)
+  maxDrawdownPct      Decimal  @db.Decimal(18, 6) @default(0)
+  status              String   @default("OPEN")
+  takeProfitPct       Decimal? @db.Decimal(18, 6)
+  stopLossPct         Decimal? @db.Decimal(18, 6)
+  trailingStopPct     Decimal? @db.Decimal(18, 6)
+  openedAt            DateTime @default(now())
+  closedAt            DateTime?
+  updatedAt           DateTime @updatedAt
+
+  exits               PositionExit[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([mint])
+}
+
+model PositionExit {
+  id          String   @id @default(uuid())
+  positionId  String
+  position    Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  amountToken Decimal  @db.Decimal(36, 18)
+  amountSol   Decimal  @db.Decimal(18, 9)
+  priceUsd    Decimal  @db.Decimal(36, 18)
+  pnlSol      Decimal  @db.Decimal(18, 9)
+  reason      String?
+  signature   String?
+  createdAt   DateTime @default(now())
+
+  @@index([positionId])
+}
+
+model PortfolioSnapshot {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalSol        Decimal  @db.Decimal(18, 9)
+  realizedPnlSol  Decimal  @db.Decimal(18, 9)
+  unrealizedPnlSol Decimal @db.Decimal(18, 9)
+  exposureSol     Decimal  @db.Decimal(18, 9)
+  positionCount   Int
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  walletId    String
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  signature   String   @unique
+  slot        BigInt?
+  status      String
+  raw         Json?
+  createdAt   DateTime @default(now())
+
+  @@index([walletId])
+}
+
+model RiskEvent {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  reason      String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ActivityEvent {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  walletId    String?
+  wallet      Wallet?  @relation(fields: [walletId], references: [id], onDelete: SetNull)
+  tokenId     String?
+  type        String
+  message     String
+  severity    String   @default("INFO")
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([type])
+}
+
+model Alert {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  condition   Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel     String
+  title       String
+  body        String
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Referral {
+  id            String   @id @default(uuid())
+  referrerId    String
+  referrer      User     @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredId    String   @unique
+  referred      User     @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+  code          String
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now())
+  qualifiedAt   DateTime?
+  rewards       ReferralReward[]
+
+  @@index([referrerId])
+  @@index([code])
+}
+
+model ReferralReward {
+  id          String   @id @default(uuid())
+  referralId  String
+  referral    Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  amountSol   Decimal  @db.Decimal(18, 9)
+  status      String   @default("PENDING")
+  paidAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([referralId])
+}
+
+model SupportTicket {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    String
+  subject     String
+  body        String
+  status      String   @default("OPEN")
+  txSignature String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action      String
+  resource    String?
+  resourceId  String?
+  ipAddress   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
