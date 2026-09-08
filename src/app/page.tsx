@@ -66,7 +66,7 @@ export default function HomePage() {
         if (data.wallets?.length > 0) setStep("dashboard");
       }
     } catch {
-      /* first load */
+      /* */
     }
   }, []);
 
@@ -83,7 +83,7 @@ export default function HomePage() {
       setPortfolio(p);
       setHealth(hl);
     } catch {
-      /* keep last */
+      /* */
     }
   }, []);
 
@@ -154,26 +154,53 @@ export default function HomePage() {
 
   if (step === "intro") {
     return (
-      <main className="min-h-dvh flex flex-col pb-16">
-        <div className="flex-1 flex flex-col justify-center px-5 max-w-md mx-auto w-full space-y-6">
-          <Brand />
-          <div className="space-y-2">
-            <h1 className="text-xl font-semibold text-white tracking-tight">
-              Solana trading terminal
+      <main className="min-h-dvh flex flex-col pb-16 relative overflow-hidden">
+        <div className="hero-glow" aria-hidden />
+        <div className="flex-1 flex flex-col justify-center px-5 max-w-md mx-auto w-full space-y-6 relative z-10">
+          <div className="animate-fade-up">
+            <Brand />
+          </div>
+          <div className="space-y-3 animate-fade-up-delay-1">
+            <span className="hero-tag">
+              <span className="dot dot-live pulse-dot" />
+              Live infrastructure
+            </span>
+            <h1 className="hero-title">
+              Solana trading
+              <br />
+              terminal
             </h1>
-            <p className="text-sm text-[var(--muted)] leading-relaxed">
-              Fund → Hunt → Filter → Enter → Watch → Exit. Automated strategies with a mandatory risk engine. Real balances and confirmed transactions only.
+            <p className="hero-sub">
+              Fund → Hunt → Filter → Enter → Watch → Exit. Automated strategies
+              with a mandatory risk engine. Real balances and confirmed
+              transactions only.
             </p>
           </div>
-          <FeatureStrip />
-          <div className="panel p-3 space-y-2 text-[11px] mono text-[var(--muted)]">
-            <p className="flex justify-between"><span>Risk engine</span><span className="text-[var(--success)]">MANDATORY</span></p>
-            <p className="flex justify-between"><span>Mock data</span><span className="text-[var(--danger)]">DISABLED</span></p>
-            <p className="flex justify-between"><span>Keys</span><span className="text-white">AES-256-GCM</span></p>
+          <div className="animate-fade-up-delay-2">
+            <FeatureStrip />
           </div>
-          <Button size="lg" onClick={() => setStep("terms")}>
-            Continue
-          </Button>
+          <div className="panel p-3 space-y-2.5 text-[11px] mono text-[var(--muted)] animate-fade-up-delay-3">
+            <p className="flex justify-between items-center">
+              <span>Risk engine</span>
+              <span className="text-[var(--success)] tracking-wide">MANDATORY</span>
+            </p>
+            <p className="flex justify-between items-center">
+              <span>Mock data</span>
+              <span className="text-[var(--danger)] tracking-wide">DISABLED</span>
+            </p>
+            <p className="flex justify-between items-center">
+              <span>Keys</span>
+              <span className="text-white tracking-wide">AES-256-GCM</span>
+            </p>
+          </div>
+          <div className="animate-fade-up-delay-4 space-y-2">
+            <Button size="lg" className="btn-shine" onClick={() => setStep("terms")}>
+              Continue
+            </Button>
+            <p className="text-center text-[10px] mono text-[var(--muted)] tracking-wider">
+              FUND · HUNT · TRADE
+            </p>
+          </div>
         </div>
         <BottomNav />
       </main>
@@ -183,16 +210,21 @@ export default function HomePage() {
   if (step === "terms") {
     return (
       <main className="min-h-dvh flex flex-col pb-16">
-        <div className="flex-1 px-5 py-8 max-w-md mx-auto w-full space-y-5">
+        <div className="flex-1 px-5 py-8 max-w-md mx-auto w-full space-y-5 animate-fade-in">
           <Brand />
-          <h1 className="text-lg font-semibold text-white">Before you trade</h1>
+          <h1 className="text-lg font-semibold text-white tracking-tight">Before you trade</h1>
           <div className="panel p-4 text-xs text-[var(--muted)] space-y-2 leading-relaxed">
             <p>Automated trading involves substantial risk of loss. Past scores do not guarantee future results.</p>
-            <p>PUMP AUTO does not custody funds beyond encrypted key storage you control. You are responsible for risk limits and funding.</p>
+            <p>PUMP AUTO does not custody funds beyond encrypted key storage you control.</p>
             <p>Emergency Stop blocks new entries only — it does not liquidate positions.</p>
           </div>
           <label className="flex items-start gap-2 text-xs text-[var(--foreground)]">
-            <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-0.5" />
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              className="mt-0.5"
+            />
             I understand the risks and that no returns are guaranteed.
           </label>
           <Button size="lg" disabled={!termsAccepted} onClick={() => setStep("wallet")}>
@@ -207,11 +239,11 @@ export default function HomePage() {
   if (step === "wallet") {
     return (
       <main className="min-h-dvh flex flex-col pb-16">
-        <div className="flex-1 px-5 py-8 max-w-md mx-auto w-full space-y-5">
+        <div className="flex-1 px-5 py-8 max-w-md mx-auto w-full space-y-5 animate-fade-in">
           <Brand />
           <div>
             <p className="label">Step 1</p>
-            <h1 className="text-lg font-semibold text-white">Create or import wallet</h1>
+            <h1 className="text-lg font-semibold text-white tracking-tight">Create or import wallet</h1>
             <p className="text-xs text-[var(--muted)] mt-1">
               Private keys are encrypted server-side. Never returned in API responses.
             </p>
@@ -247,7 +279,7 @@ export default function HomePage() {
   if (step === "ready") {
     return (
       <main className="min-h-dvh flex flex-col pb-16">
-        <div className="flex-1 px-5 py-8 max-w-md mx-auto w-full space-y-5">
+        <div className="flex-1 px-5 py-8 max-w-md mx-auto w-full space-y-5 animate-fade-in">
           <Brand />
           <div className="panel p-4 space-y-2">
             <p className="label">Wallet ready</p>
@@ -261,7 +293,7 @@ export default function HomePage() {
               </p>
             )}
           </div>
-          <Button size="lg" onClick={() => setStep("dashboard")}>
+          <Button size="lg" className="btn-shine" onClick={() => setStep("dashboard")}>
             Open terminal
           </Button>
         </div>
@@ -280,7 +312,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      <div className="flex-1 px-4 py-3 max-w-lg mx-auto w-full space-y-3">
+      <div className="flex-1 px-4 py-3 max-w-lg mx-auto w-full space-y-3 animate-fade-in">
         <FeatureStrip />
 
         <section className="panel p-3">
@@ -335,14 +367,18 @@ export default function HomePage() {
             ))}
           </div>
           <Link href="/terminal" className="block">
-            <Button size="lg">{isLive ? "Open terminal" : "Start trading"}</Button>
+            <Button size="lg" className="btn-shine">
+              {isLive ? "Open terminal" : "Start trading"}
+            </Button>
           </Link>
         </section>
 
         <section className="panel overflow-hidden">
           <div className="panel-header flex justify-between items-center">
             <span>Activity</span>
-            <Link href="/more/activity" className="text-[var(--primary)] normal-case tracking-normal">All</Link>
+            <Link href="/more/activity" className="text-[var(--primary)] normal-case tracking-normal">
+              All
+            </Link>
           </div>
           <div className="divide-y divide-[var(--border-subtle)] max-h-48 overflow-y-auto">
             {activity.length === 0 && (
@@ -354,7 +390,11 @@ export default function HomePage() {
               <div key={ev.id} className="px-3 py-2 flex gap-2 text-[11px]">
                 <span className="mono text-[var(--muted)] shrink-0">
                   {ev.createdAt
-                    ? new Date(ev.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+                    ? new Date(ev.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })
                     : "—"}
                 </span>
                 <span className="text-white truncate">{ev.message || ev.type}</span>
