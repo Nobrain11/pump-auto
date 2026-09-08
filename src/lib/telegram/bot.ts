@@ -1,8 +1,6 @@
 /**
- * Telegram control surface — same backend as web.
- * Long-polling; no webhook required for Railway worker.
- *
- * Env: TELEGRAM_BOT_TOKEN (required to enable)
+ * Telegram control surface — long-polling (no webhook required).
+ * Env: TELEGRAM_BOT_TOKEN
  */
 
 const API = "https://api.telegram.org";
@@ -73,16 +71,18 @@ async function handleCommand(chatId: number, text: string) {
   }
 
   if (cmd === "/status") {
-    const lines = [
-      "<b>Status</b>",
-      `Time: ${new Date().toISOString()}`,
-      `DB: ${process.env.DATABASE_URL ? "configured" : "missing"}`,
-      `RPC: ${process.env.SOLANA_RPC_URL || process.env.HELIUS_RPC_URL ? "configured" : "missing"}`,
-      `Scanner worker: running with this process`,
-      "",
-      "Open the web app for Hunt / Terminal / wallets.",
-    ];
-    await sendMessage(chatId, lines.join("\n"));
+    await sendMessage(
+      chatId,
+      [
+        "<b>Status</b>",
+        `Time: ${new Date().toISOString()}`,
+        `DB: ${process.env.DATABASE_URL ? "configured" : "missing"}`,
+        `RPC: ${process.env.SOLANA_RPC_URL || process.env.HELIUS_RPC_URL ? "configured" : "missing"}`,
+        "Scanner worker: running with this process",
+        "",
+        "Open the web app for Hunt / Terminal / wallets.",
+      ].join("\n")
+    );
     return;
   }
 
@@ -123,6 +123,18 @@ export async function telegramLoop() {
   }
 
   console.log("[telegram] polling started");
+
+  // Webhooks block getUpdates — must clear first
+  try {
+    await tg("deleteWebhook", { drop_pending_updates: true });
+    console.log("[telegram] webhook cleared (long-poll mode)");
+  } catch (err) {
+    console.warn(
+      "[telegram] deleteWebhook:",
+      err instanceof Error ? err.message : err
+    );
+  }
+
   try {
     const pending = (await tg("getUpdates", { offset: -1, timeout: 0 })) as Update[];
     if (pending?.length) {
@@ -136,10 +148,16 @@ export async function telegramLoop() {
     try {
       await telegramPollOnce();
     } catch (err) {
-      console.error(
-        "[telegram] poll error:",
-        err instanceof Error ? err.message : err
-      );
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[telegram] poll error:", msg);
+      if (msg.includes("webhook")) {
+        try {
+          await tg("deleteWebhook", { drop_pending_updates: true });
+          console.log("[telegram] webhook re-cleared");
+        } catch {
+          /* ignore */
+        }
+      }
       await new Promise((r) => setTimeout(r, 3000));
     }
   }
