@@ -1,11 +1,5 @@
 /**
  * PUMP AUTO — Bot supervisor
- * Runs scanner + execution + position loops in one process (Railway worker service).
- *
- *   pnpm run worker:bot
- *
- * Env required:
- *   DATABASE_URL, SOLANA_RPC_URL, WALLET_ENCRYPTION_KEY
  */
 
 import { createTokenDiscovery } from "@/lib/solana/token-discovery";
@@ -44,15 +38,29 @@ function signSwapTransaction(swapTransactionBase64: string, secretKeyBase58: str
 
 async function scannerTick() {
   const discovery = createTokenDiscovery();
-  const discovered = await discovery.getRecentTokens(25);
+  const discovered = await discovery.getRecentTokens(30);
   const opportunities = analyzeBatch(discovered, DEFAULT_FILTERS);
   const passed = opportunities.filter((o) => o.passedFilters);
+  const rejected = opportunities.filter((o) => !o.passedFilters);
   console.log(
-    `[scanner] discovered=${discovered.length} scored=${opportunities.length} passed=${passed.length}`
+    `[scanner] discovered=${discovered.length} scored=${opportunities.length} passed=${passed.length} rejected=${rejected.length}`
   );
   for (const opp of passed.slice(0, 5)) {
     console.log(
-      `  ✓ ${opp.symbol || opp.mint.slice(0, 8)} score=${opp.score.overall} risk=${opp.score.risk}`
+      `  ✓ ${opp.symbol || opp.mint.slice(0, 8)} score=${opp.score.overall} risk=${opp.score.risk} liq=${opp.market?.liquidityUsd ?? "?"}`
+    );
+  }
+  const reasonCounts = new Map<string, number>();
+  for (const o of rejected) {
+    for (const r of o.rejectReasons.slice(0, 2)) {
+      const key = r.slice(0, 56);
+      reasonCounts.set(key, (reasonCounts.get(key) || 0) + 1);
+    }
+  }
+  const topReasons = [...reasonCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  if (topReasons.length) {
+    console.log(
+      `[scanner] top rejects: ${topReasons.map(([r, n]) => `${r}×${n}`).join(" | ")}`
     );
   }
 }
@@ -264,9 +272,7 @@ async function ensureDatabase() {
     process.exit(1);
   }
   if (url.includes("localhost") || url.includes("127.0.0.1")) {
-    console.error(
-      "[bot] FATAL: DATABASE_URL points to localhost. On Railway use the Postgres service URL (*.railway.internal)."
-    );
+    console.error("[bot] FATAL: DATABASE_URL points to localhost");
     process.exit(1);
   }
 
@@ -276,14 +282,8 @@ async function ensureDatabase() {
       console.log("[bot] database reachable");
       break;
     } catch (err) {
-      console.warn(
-        `[bot] waiting for database (${i}/30):`,
-        err instanceof Error ? err.message : err
-      );
-      if (i === 30) {
-        console.error("[bot] FATAL: could not reach database");
-        process.exit(1);
-      }
+      console.warn(`[bot] waiting for database (${i}/30)`);
+      if (i === 30) process.exit(1);
       await sleep(2000);
     }
   }
@@ -292,9 +292,7 @@ async function ensureDatabase() {
     await prisma.$queryRaw`SELECT 1 FROM "Order" LIMIT 1`;
     console.log("[bot] schema present (Order table found)");
   } catch {
-    console.warn(
-      "[bot] tables missing — start command runs `prisma db push`; if this persists, run it manually with DATABASE_URL"
-    );
+    console.warn("[bot] tables missing — start script should run prisma db push");
   }
 }
 
@@ -305,8 +303,7 @@ async function loop(name: string, fn: () => Promise<unknown>, intervalMs: number
     } catch (err) {
       const msg = err instanceof Error ? redactSecrets(err.message) : String(err);
       if (isSchemaError(err)) {
-        console.error(`[${name}] schema/db issue — apply schema with: pnpm exec prisma db push`);
-        console.error(`[${name}]`, msg.slice(0, 200));
+        console.error(`[${name}] schema/db issue`, msg.slice(0, 200));
         await sleep(Math.max(intervalMs, 15_000));
         continue;
       }
@@ -321,15 +318,7 @@ async function main() {
   await ensureDatabase();
   console.log("[bot] NODE_ENV=", process.env.NODE_ENV);
   console.log("[bot] intervals scanner/exec/pos", SCANNER_MS, EXECUTION_MS, POSITION_MS);
-
-  const missing: string[] = [];
-  if (!process.env.DATABASE_URL) missing.push("DATABASE_URL");
-  if (!process.env.SOLANA_RPC_URL && !process.env.HELIUS_RPC_URL)
-    missing.push("SOLANA_RPC_URL|HELIUS_RPC_URL");
-  if (!process.env.WALLET_ENCRYPTION_KEY) missing.push("WALLET_ENCRYPTION_KEY");
-  if (missing.length) {
-    console.warn("[bot] missing env:", missing.join(", "));
-  }
+  console.log("[bot] filters", JSON.stringify(DEFAULT_FILTERS));
 
   await Promise.all([
     loop("scanner", scannerTick, SCANNER_MS),
@@ -337,9 +326,7 @@ async function main() {
       "execution",
       async () => {
         let worked = true;
-        while (worked) {
-          worked = await executionTick();
-        }
+        while (worked) worked = await executionTick();
       },
       EXECUTION_MS
     ),
