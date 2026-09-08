@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma db push && NODE_ENV=production next build",
-    "start": "NODE_ENV=production next start",
-    "start:bot": "prisma db push && tsx --tsconfig tsconfig.json src/workers/bot.ts",
+    "build": "prisma generate && NODE_ENV=production next build",
+    "start": "prisma db push && NODE_ENV=production next start",
+    "start:bot": "prisma generate && prisma db push && tsx --tsconfig tsconfig.json src/workers/bot.ts",
     "postinstall": "prisma generate",
     "lint": "eslint",
     "db:generate": "prisma generate",
