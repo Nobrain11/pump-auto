@@ -9,20 +9,9 @@ const url = process.env.DATABASE_URL || "";
 function fail(msg) {
   console.error("\n[PUMP AUTO] FATAL:", msg);
   console.error(`
-Fix on Railway (web service → Variables):
-
-  1. Open your Postgres plugin → Variables
-  2. Copy DATABASE_URL (or use reference syntax)
-  3. On the WEB service set:
-
-       DATABASE_URL="${{Postgres.DATABASE_URL}}"
-
-     (use your actual Postgres service name)
-
-  Internal URLs look like:
-       postgresql://...@postgres.railway.internal:5432/railway
-
-  NEVER use localhost or the values from .env.example in production.
+Fix DATABASE_URL on Railway (web service → Variables):
+  DATABASE_URL=\${{Postgres.DATABASE_URL}}
+  Must be postgres.railway.internal — never localhost.
 `);
   process.exit(1);
 }
@@ -30,36 +19,33 @@ Fix on Railway (web service → Variables):
 if (!url) fail("DATABASE_URL is not set");
 if (/localhost|127\.0\.0\.1/.test(url)) {
   fail(
-    `DATABASE_URL points to localhost (got host from: ${url.replace(/:[^:@/]+@/, ":***@")}). Railway containers cannot reach localhost Postgres.`
+    `DATABASE_URL points to localhost. Set Railway Postgres URL (postgres.railway.internal).`
   );
 }
 
-console.log("[PUMP AUTO] Applying schema (prisma db push)…");
-const push = spawnSync("pnpm", ["exec", "prisma", "db", "push"], {
-  stdio: "inherit",
-  env: process.env,
-  shell: false,
-});
+console.log("[PUMP AUTO] Applying schema (prisma db push --accept-data-loss)…");
+console.log(
+  "[PUMP AUTO] Note: if this DB is shared with another app, prefer a dedicated Postgres service."
+);
+
+const pushArgs = ["exec", "prisma", "db", "push", "--accept-data-loss"];
+let push = spawnSync("pnpm", pushArgs, { stdio: "inherit", env: process.env });
 if (push.status !== 0) {
-  // try npx fallback
-  const push2 = spawnSync("npx", ["prisma", "db", "push"], {
+  push = spawnSync("npx", ["prisma", "db", "push", "--accept-data-loss"], {
     stdio: "inherit",
     env: process.env,
   });
-  if (push2.status !== 0) fail("prisma db push failed — check DATABASE_URL and that Postgres is running");
+  if (push.status !== 0) fail("prisma db push failed");
 }
 
 console.log("[PUMP AUTO] Starting Next.js…");
 process.env.NODE_ENV = "production";
-const next = spawnSync("pnpm", ["exec", "next", "start"], {
+let next = spawnSync("pnpm", ["exec", "next", "start"], {
   stdio: "inherit",
   env: process.env,
 });
 if (next.status !== 0) {
-  const next2 = spawnSync("npx", ["next", "start"], {
-    stdio: "inherit",
-    env: process.env,
-  });
-  process.exit(next2.status ?? 1);
+  next = spawnSync("npx", ["next", "start"], { stdio: "inherit", env: process.env });
+  process.exit(next.status ?? 1);
 }
 process.exit(next.status ?? 0);
