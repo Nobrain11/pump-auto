@@ -17,10 +17,12 @@ export function FeatureStrip({ className }: { className?: string }) {
         <Link
           key={f.href}
           href={f.href}
-          className="panel flex flex-col items-center justify-center gap-0.5 py-2.5 px-1 hover:border-[var(--primary)]/40 transition-colors"
+          className="panel flex flex-col items-center justify-center gap-0.5 py-2.5 px-1 hover:border-[var(--primary)]/35 active:scale-[0.98] transition-all"
         >
           <span className="text-sm text-[var(--primary)] leading-none">{f.icon}</span>
-          <span className="text-[10px] mono text-white font-medium">{f.label}</span>
+          <span className="text-[10px] mono text-white font-medium tracking-wide">
+            {f.label}
+          </span>
           <span className="text-[9px] text-[var(--muted)] leading-none">{f.hint}</span>
         </Link>
       ))}

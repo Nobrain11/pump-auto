@@ -16,8 +16,11 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "PUMP AUTO — Solana Trading Terminal",
-  description: "Fund. Hunt. Trade. Professional Solana automated trading terminal.",
-  icons: { icon: "/favicon.svg" },
+  description:
+    "PUMP AUTO — professional Solana trading terminal. Fund. Hunt. Filter. Trade. Real data only.",
+  icons: {
+    icon: "/favicon.svg",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
