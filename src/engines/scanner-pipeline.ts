@@ -6,9 +6,8 @@
 import {
   computeTokenScore,
   type TokenMetrics,
-  type TokenScoreBreakdown,
-  type RiskLevel,
 } from "@/engines/token-scoring";
+import type { TokenScoreBreakdown, RiskLevel } from "@/types";
 import type { DiscoveredToken } from "@/lib/solana/token-discovery";
 import type { TokenMarketSnapshot } from "@/providers/market-data-provider";
 
