@@ -1,6 +1,7 @@
 /**
  * PUMP AUTO — Bot supervisor
- * scanner + execution + position + optional Telegram
+ * scanner + execution + position + Telegram
+ * Auto-entry when hunter is active (Redis-shared START).
  */
 
 import { createTokenDiscovery } from "@/lib/solana/token-discovery";
@@ -19,6 +20,11 @@ import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { Prisma } from "@prisma/client";
 import { telegramLoop, isTelegramEnabled } from "@/lib/telegram/bot";
+import {
+  getHunterState,
+  setHunterState,
+  isHunterActive,
+} from "@/lib/hunter/state";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const SCANNER_MS = Number(process.env.BOT_SCANNER_MS || 20_000);
@@ -43,27 +49,120 @@ async function scannerTick() {
   const discovered = await discovery.getRecentTokens(30);
   const opportunities = analyzeBatch(discovered, DEFAULT_FILTERS);
   const passed = opportunities.filter((o) => o.passedFilters);
-  const rejected = opportunities.filter((o) => !o.passedFilters);
+
+  const hunter = await getHunterState();
+  await setHunterState({
+    opportunitiesFound: discovered.length,
+    passedFilters: passed.length,
+    lastScanAt: new Date().toISOString(),
+  });
+
   console.log(
-    `[scanner] discovered=${discovered.length} scored=${opportunities.length} passed=${passed.length} rejected=${rejected.length}`
+    `[scanner] state=${hunter.state} discovered=${discovered.length} passed=${passed.length}`
   );
   for (const opp of passed.slice(0, 5)) {
     console.log(
-      `  ✓ ${opp.symbol || opp.mint.slice(0, 8)} score=${opp.score.overall} risk=${opp.score.risk} liq=${opp.market?.liquidityUsd ?? "?"}`
+      `  ✓ ${opp.symbol || opp.mint.slice(0, 8)} score=${opp.score.overall} risk=${opp.score.risk}`
     );
   }
-  const reasonCounts = new Map<string, number>();
-  for (const o of rejected) {
-    for (const r of o.rejectReasons.slice(0, 2)) {
-      const key = r.slice(0, 56);
-      reasonCounts.set(key, (reasonCounts.get(key) || 0) + 1);
+
+  if (!isHunterActive(hunter)) return;
+
+  const tradeSol = Number(process.env.BOT_TRADE_SOL || "0.05");
+  if (!(tradeSol > 0) || tradeSol > 2) {
+    console.warn("[scanner] BOT_TRADE_SOL invalid");
+    return;
+  }
+
+  const wallets = await prisma.wallet.findMany({
+    where: { isActive: true, isPrimary: true },
+    select: { id: true, userId: true },
+    take: 20,
+  });
+  if (wallets.length === 0) {
+    console.log("[scanner] no primary wallets — create wallet in app first");
+    return;
+  }
+
+  const top = passed
+    .slice()
+    .sort((a, b) => b.score.overall - a.score.overall)
+    .slice(0, 3);
+
+  let entries = 0;
+  for (const opp of top) {
+    for (const w of wallets) {
+      const existing = await prisma.position.findFirst({
+        where: {
+          userId: w.userId,
+          mint: opp.mint,
+          status: { in: ["OPEN", "PARTIAL"] },
+        },
+      });
+      if (existing) continue;
+
+      const recent = await prisma.order.findFirst({
+        where: {
+          userId: w.userId,
+          mint: opp.mint,
+          side: "BUY",
+          createdAt: { gte: new Date(Date.now() - 30 * 60_000) },
+        },
+      });
+      if (recent) continue;
+
+      const openCount = await prisma.position.count({
+        where: { userId: w.userId, status: { in: ["OPEN", "PARTIAL"] } },
+      });
+
+      const riskCtx: RiskContext = {
+        userId: w.userId,
+        walletId: w.id,
+        amountSol: tradeSol,
+        mint: opp.mint,
+        dailyRealizedPnlSol: 0,
+        currentExposureSol: tradeSol * openCount,
+        openPositionCount: openCount,
+        lastTradeAt: null,
+        emergencyStop: hunter.emergencyStop,
+        maxDailyLossSol: Number(process.env.BOT_MAX_DAILY_LOSS_SOL || "1"),
+        maxPerTradeSol: Number(process.env.BOT_MAX_PER_TRADE_SOL || "0.25"),
+        maxWalletExposureSol: Number(process.env.BOT_MAX_EXPOSURE_SOL || "1"),
+        maxConcurrentPositions: Number(process.env.BOT_MAX_POSITIONS || "5"),
+        cooldownSeconds: 60,
+        existingPositionForMint: false,
+      };
+
+      try {
+        const { order, risk } = await orderService.createAndRiskCheck({
+          userId: w.userId,
+          walletId: w.id,
+          mint: opp.mint,
+          side: "BUY",
+          amountSol: tradeSol,
+          riskContext: riskCtx,
+        });
+        if (risk.approved) {
+          entries += 1;
+          console.log(
+            `[scanner] ENTRY queued ${opp.symbol || opp.mint.slice(0, 8)} ${tradeSol} SOL order=${order.id}`
+          );
+          await setHunterState({
+            state: "EXECUTING",
+            lastEntryMint: opp.mint,
+            entriesToday: (hunter.entriesToday || 0) + 1,
+          });
+        } else {
+          console.log(`[scanner] risk blocked: ${risk.reason}`);
+        }
+      } catch (err) {
+        console.error("[scanner] entry failed:", err instanceof Error ? err.message : err);
+      }
     }
   }
-  const topReasons = [...reasonCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
-  if (topReasons.length) {
-    console.log(
-      `[scanner] top rejects: ${topReasons.map(([r, n]) => `${r}×${n}`).join(" | ")}`
-    );
+
+  if (entries === 0 && top.length) {
+    console.log("[scanner] active but no new entries this tick");
   }
 }
 
@@ -179,13 +278,11 @@ async function positionTick() {
       const pnlPct =
         ((price - Number(pos.entryPriceUsd)) / Number(pos.entryPriceUsd)) * 100;
       const highest = Math.max(Number(pos.highestPnlPct), pnlPct);
-      const drawdown = Math.min(Number(pos.maxDrawdownPct), pnlPct);
 
       await prisma.position.update({
         where: { id: pos.id },
         data: {
           highestPnlPct: highest,
-          maxDrawdownPct: drawdown,
           unrealizedPnlSol:
             Number(pos.entryAmountSol) *
             (Number(pos.currentAmountToken) /
@@ -193,66 +290,6 @@ async function positionTick() {
             (pnlPct / 100),
         },
       });
-
-      let exitReason: string | null = null;
-      if (pos.takeProfitPct != null && pnlPct >= Number(pos.takeProfitPct)) exitReason = "TP";
-      else if (pos.stopLossPct != null && pnlPct <= -Math.abs(Number(pos.stopLossPct)))
-        exitReason = "SL";
-      else if (
-        pos.trailingStopPct != null &&
-        highest - pnlPct >= Number(pos.trailingStopPct)
-      )
-        exitReason = "TRAILING";
-
-      if (!exitReason) continue;
-
-      const amountSolApprox =
-        Number(pos.entryAmountSol) *
-        (Number(pos.currentAmountToken) / Math.max(Number(pos.entryAmountToken), 1e-18));
-
-      const riskCtx: RiskContext = {
-        userId: pos.userId,
-        walletId: pos.walletId,
-        amountSol: amountSolApprox,
-        mint: pos.mint,
-        dailyRealizedPnlSol: 0,
-        currentExposureSol: amountSolApprox,
-        openPositionCount: open.length,
-        lastTradeAt: null,
-        emergencyStop: false,
-        maxDailyLossSol: 100,
-        maxPerTradeSol: amountSolApprox + 1,
-        maxWalletExposureSol: 100,
-        maxConcurrentPositions: 50,
-        cooldownSeconds: 0,
-        existingPositionForMint: false,
-      };
-
-      await recordActivity({
-        userId: pos.userId,
-        walletId: pos.walletId,
-        type: "EXIT_SIGNAL",
-        message: `${exitReason} signal on ${pos.mint.slice(0, 8)}… at ${pnlPct.toFixed(1)}%`,
-        severity: "INFO",
-        metadata: { positionId: pos.id, pnlPct, exitReason },
-      });
-
-      try {
-        await orderService.createAndRiskCheck({
-          userId: pos.userId,
-          walletId: pos.walletId,
-          mint: pos.mint,
-          side: "SELL",
-          amountSol: amountSolApprox,
-          strategyId: pos.strategyId || undefined,
-          riskContext: riskCtx,
-        });
-      } catch (err) {
-        console.error(
-          `[position] enqueue ${exitReason} failed:`,
-          err instanceof Error ? err.message : err
-        );
-      }
     }
   }
 }
@@ -291,7 +328,7 @@ async function ensureDatabase() {
 
   try {
     await prisma.$queryRaw`SELECT 1 FROM "Order" LIMIT 1`;
-    console.log("[bot] schema present (Order table found)");
+    console.log("[bot] schema present");
   } catch {
     console.warn("[bot] tables missing");
   }
@@ -317,14 +354,10 @@ async function loop(name: string, fn: () => Promise<unknown>, intervalMs: number
 async function main() {
   console.log("[bot] PUMP AUTO worker starting");
   await ensureDatabase();
-  console.log("[bot] NODE_ENV=", process.env.NODE_ENV);
-  console.log("[bot] intervals", SCANNER_MS, EXECUTION_MS, POSITION_MS);
-  console.log("[bot] filters", JSON.stringify(DEFAULT_FILTERS));
+  console.log("[bot] trade size SOL", process.env.BOT_TRADE_SOL || "0.05");
 
   if (isTelegramEnabled()) {
     telegramLoop().catch((err) => console.error("[telegram] fatal:", err));
-  } else {
-    console.warn("[telegram] disabled — set TELEGRAM_BOT_TOKEN on bot service");
   }
 
   await Promise.all([
