@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { Brand } from "@/components/layout/brand";
+import { FeatureStrip } from "@/components/layout/feature-strip";
 
 type OnboardingStep = "intro" | "terms" | "wallet" | "ready" | "dashboard";
 
@@ -107,7 +108,7 @@ export default function HomePage() {
         body: JSON.stringify({ name: "Main" }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to create wallet");
+      if (!res.ok) throw new Error(data.error || data.detail || "Failed to create wallet");
       await fetchWallets();
       setStep("ready");
     } catch (e) {
@@ -154,7 +155,7 @@ export default function HomePage() {
   if (step === "intro") {
     return (
       <main className="min-h-dvh flex flex-col pb-16">
-        <div className="flex-1 flex flex-col justify-center px-5 max-w-md mx-auto w-full space-y-8">
+        <div className="flex-1 flex flex-col justify-center px-5 max-w-md mx-auto w-full space-y-6">
           <Brand />
           <div className="space-y-2">
             <h1 className="text-xl font-semibold text-white tracking-tight">
@@ -164,6 +165,7 @@ export default function HomePage() {
               Fund → Hunt → Filter → Enter → Watch → Exit. Automated strategies with a mandatory risk engine. Real balances and confirmed transactions only.
             </p>
           </div>
+          <FeatureStrip />
           <div className="panel p-3 space-y-2 text-[11px] mono text-[var(--muted)]">
             <p className="flex justify-between"><span>Risk engine</span><span className="text-[var(--success)]">MANDATORY</span></p>
             <p className="flex justify-between"><span>Mock data</span><span className="text-[var(--danger)]">DISABLED</span></p>
@@ -190,12 +192,7 @@ export default function HomePage() {
             <p>Emergency Stop blocks new entries only — it does not liquidate positions.</p>
           </div>
           <label className="flex items-start gap-2 text-xs text-[var(--foreground)]">
-            <input
-              type="checkbox"
-              checked={termsAccepted}
-              onChange={(e) => setTermsAccepted(e.target.checked)}
-              className="mt-0.5"
-            />
+            <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-0.5" />
             I understand the risks and that no returns are guaranteed.
           </label>
           <Button size="lg" disabled={!termsAccepted} onClick={() => setStep("wallet")}>
@@ -284,6 +281,8 @@ export default function HomePage() {
       </header>
 
       <div className="flex-1 px-4 py-3 max-w-lg mx-auto w-full space-y-3">
+        <FeatureStrip />
+
         <section className="panel p-3">
           <div className="flex justify-between items-start">
             <div>
@@ -335,19 +334,10 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-          <p className="text-[10px] mono text-[var(--muted)]">
-            Regime {hunter?.marketRegime || "—"}
-            {hunter?.emergencyStop ? " · EMERGENCY STOP" : ""}
-          </p>
           <Link href="/terminal" className="block">
             <Button size="lg">{isLive ? "Open terminal" : "Start trading"}</Button>
           </Link>
         </section>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Link href="/hunt"><Button variant="secondary" size="md" className="w-full">Hunt</Button></Link>
-          <Link href="/more/smart-devs"><Button variant="secondary" size="md" className="w-full">Smart Devs</Button></Link>
-        </div>
 
         <section className="panel overflow-hidden">
           <div className="panel-header flex justify-between items-center">
@@ -372,10 +362,6 @@ export default function HomePage() {
             ))}
           </div>
         </section>
-
-        {primary && (
-          <p className="text-[10px] mono text-[var(--muted)] text-center truncate px-2">{primary.publicKey}</p>
-        )}
       </div>
 
       <BottomNav />
