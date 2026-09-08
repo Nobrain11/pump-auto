@@ -3,12 +3,8 @@
  * Filter → score → rank. Never invent market data.
  */
 
-import {
-  computeTokenScore,
-  type TokenMetrics,
-  type TokenScoreBreakdown,
-  type RiskLevel,
-} from "@/engines/token-scoring";
+import { computeTokenScore, type TokenMetrics } from "@/engines/token-scoring";
+import type { TokenScoreBreakdown, RiskLevel } from "@/types";
 import type { DiscoveredToken } from "@/lib/solana/token-discovery";
 import type { TokenMarketSnapshot } from "@/providers/market-data-provider";
 
@@ -97,7 +93,6 @@ export function analyzeToken(
   ) {
     rejectReasons.push("Volume below minimum");
   }
-  // Only reject when authority is known true (null = unknown, do not hard-fail)
   if (filters.requireNoMintAuthority && metrics.hasMintAuthority === true) {
     rejectReasons.push("Mint authority still enabled");
   }
