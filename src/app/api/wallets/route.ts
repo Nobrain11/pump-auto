@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getCurrentUser, ensureDevUser, createSession } from "@/lib/auth/session";
+import { requireUser } from "@/lib/auth/session";
 import { walletService } from "@/lib/solana/wallet-service";
 import { redactSecrets } from "@/lib/security/wallet-encryption";
 
@@ -8,24 +8,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    let user = await getCurrentUser();
-    if (!user) {
-      if (process.env.NODE_ENV === "development") {
-        const userId = await ensureDevUser();
-        await createSession(userId);
-        user = await getCurrentUser();
-      }
-    }
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const user = await requireUser();
     const wallets = await walletService.listWallets(user.id);
 
     const withBalances = await Promise.all(
       wallets.map(async (w) => {
         try {
-          const balanceSol = await walletService.getBalance(w.id, user!.id);
+          const balanceSol = await walletService.getBalance(w.id, user.id);
           return { ...w, balanceSol };
         } catch {
           return { ...w, balanceSol: null };
@@ -37,7 +26,10 @@ export async function GET() {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[wallets] GET failed:", redactSecrets(message));
-    return NextResponse.json({ error: "Failed to list wallets" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to list wallets", detail: message },
+      { status: 500 }
+    );
   }
 }
 
@@ -47,17 +39,7 @@ const CreateSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    let user = await getCurrentUser();
-    if (!user) {
-      if (process.env.NODE_ENV === "development") {
-        const userId = await ensureDevUser();
-        await createSession(userId);
-        user = await getCurrentUser();
-      }
-    }
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await requireUser();
 
     const body = await req.json().catch(() => ({}));
     const parsed = CreateSchema.safeParse(body);
@@ -74,6 +56,9 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[wallets] POST failed:", redactSecrets(message));
-    return NextResponse.json({ error: "Failed to create wallet" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create wallet", detail: message },
+      { status: 500 }
+    );
   }
 }

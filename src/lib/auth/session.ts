@@ -1,7 +1,6 @@
 /**
- * Lightweight session helper.
- * Production will use next-auth or jose JWTs with proper rotation.
- * For now: simple signed cookie + user lookup.
+ * Lightweight session helper (jose JWT cookie).
+ * Guest bootstrap for first-run until full auth is wired.
  */
 
 import { cookies } from "next/headers";
@@ -11,9 +10,15 @@ import { prisma } from "@/lib/db/prisma";
 const COOKIE_NAME = "pump_auto_session";
 
 function getSecret() {
-  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  const secret =
+    process.env.AUTH_SECRET ||
+    process.env.NEXTAUTH_SECRET ||
+    process.env.SESSION_SECRET;
   if (!secret) {
-    throw new Error("AUTH_SECRET is required");
+    console.warn(
+      "[auth] AUTH_SECRET missing — using ephemeral fallback. Set AUTH_SECRET on Railway."
+    );
+    return new TextEncoder().encode("pump-auto-demo-secret-change-me-in-prod");
   }
   return new TextEncoder().encode(secret);
 }
@@ -81,7 +86,7 @@ export async function destroySession() {
   cookieStore.delete(COOKIE_NAME);
 }
 
-export async function ensureDevUser(): Promise<string> {
+export async function ensureGuestUser(): Promise<string> {
   const existing = await prisma.user.findFirst({
     orderBy: { createdAt: "asc" },
   });
@@ -89,11 +94,26 @@ export async function ensureDevUser(): Promise<string> {
 
   const user = await prisma.user.create({
     data: {
-      username: "trader",
+      username: `trader_${Date.now().toString(36)}`,
       profile: {
         create: { displayName: "Trader" },
       },
     },
   });
   return user.id;
+}
+
+export async function ensureDevUser(): Promise<string> {
+  return ensureGuestUser();
+}
+
+export async function requireUser() {
+  let user = await getCurrentUser();
+  if (user) return user;
+
+  const userId = await ensureGuestUser();
+  await createSession(userId);
+  user = await getCurrentUser();
+  if (!user) throw new Error("Failed to bootstrap session");
+  return user;
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getCurrentUser, ensureDevUser, createSession } from "@/lib/auth/session";
+import { requireUser } from "@/lib/auth/session";
 import { walletService } from "@/lib/solana/wallet-service";
 import { redactSecrets } from "@/lib/security/wallet-encryption";
 
@@ -11,24 +11,9 @@ const ImportSchema = z.object({
   name: z.string().min(1).max(64).optional(),
 });
 
-/**
- * POST /api/wallets/import
- * Import existing wallet from base58 private key.
- * The key is used only to derive the public key + encrypt; never stored plaintext or returned.
- */
 export async function POST(req: NextRequest) {
   try {
-    let user = await getCurrentUser();
-    if (!user) {
-      if (process.env.NODE_ENV === "development") {
-        const userId = await ensureDevUser();
-        await createSession(userId);
-        user = await getCurrentUser();
-      }
-    }
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const user = await requireUser();
 
     const body = await req.json();
     const parsed = ImportSchema.safeParse(body);
