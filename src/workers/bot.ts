@@ -2,12 +2,10 @@
  * PUMP AUTO — Bot supervisor
  * Runs scanner + execution + position loops in one process (Railway worker service).
  *
- *   npm run worker:bot
+ *   pnpm run worker:bot
  *
  * Env required:
  *   DATABASE_URL, SOLANA_RPC_URL, WALLET_ENCRYPTION_KEY
- * Optional:
- *   REDIS_URL, JUPITER_API_URL, JUPITER_API_KEY, HELIUS_RPC_URL
  */
 
 import { createTokenDiscovery } from "@/lib/solana/token-discovery";
@@ -249,15 +247,70 @@ async function positionTick() {
   }
 }
 
+function isSchemaError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes("does not exist") ||
+    msg.includes("P2021") ||
+    msg.includes("P1001") ||
+    msg.includes("Can't reach database")
+  );
+}
+
+async function ensureDatabase() {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    console.error("[bot] FATAL: DATABASE_URL is not set");
+    process.exit(1);
+  }
+  if (url.includes("localhost") || url.includes("127.0.0.1")) {
+    console.error(
+      "[bot] FATAL: DATABASE_URL points to localhost. On Railway use the Postgres service URL (*.railway.internal)."
+    );
+    process.exit(1);
+  }
+
+  for (let i = 1; i <= 30; i++) {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      console.log("[bot] database reachable");
+      break;
+    } catch (err) {
+      console.warn(
+        `[bot] waiting for database (${i}/30):`,
+        err instanceof Error ? err.message : err
+      );
+      if (i === 30) {
+        console.error("[bot] FATAL: could not reach database");
+        process.exit(1);
+      }
+      await sleep(2000);
+    }
+  }
+
+  try {
+    await prisma.$queryRaw`SELECT 1 FROM "Order" LIMIT 1`;
+    console.log("[bot] schema present (Order table found)");
+  } catch {
+    console.warn(
+      "[bot] tables missing — start command runs `prisma db push`; if this persists, run it manually with DATABASE_URL"
+    );
+  }
+}
+
 async function loop(name: string, fn: () => Promise<unknown>, intervalMs: number) {
   for (;;) {
     try {
       await fn();
     } catch (err) {
-      console.error(
-        `[${name}]`,
-        err instanceof Error ? redactSecrets(err.message) : err
-      );
+      const msg = err instanceof Error ? redactSecrets(err.message) : String(err);
+      if (isSchemaError(err)) {
+        console.error(`[${name}] schema/db issue — apply schema with: pnpm exec prisma db push`);
+        console.error(`[${name}]`, msg.slice(0, 200));
+        await sleep(Math.max(intervalMs, 15_000));
+        continue;
+      }
+      console.error(`[${name}]`, msg);
     }
     await sleep(intervalMs);
   }
@@ -265,6 +318,7 @@ async function loop(name: string, fn: () => Promise<unknown>, intervalMs: number
 
 async function main() {
   console.log("[bot] PUMP AUTO worker starting");
+  await ensureDatabase();
   console.log("[bot] NODE_ENV=", process.env.NODE_ENV);
   console.log("[bot] intervals scanner/exec/pos", SCANNER_MS, EXECUTION_MS, POSITION_MS);
 
@@ -274,7 +328,7 @@ async function main() {
     missing.push("SOLANA_RPC_URL|HELIUS_RPC_URL");
   if (!process.env.WALLET_ENCRYPTION_KEY) missing.push("WALLET_ENCRYPTION_KEY");
   if (missing.length) {
-    console.warn("[bot] missing env (some features will fail):", missing.join(", "));
+    console.warn("[bot] missing env:", missing.join(", "));
   }
 
   await Promise.all([
