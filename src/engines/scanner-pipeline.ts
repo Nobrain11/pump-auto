@@ -1,13 +1,14 @@
 /**
  * Auto-Hunter Scanner Pipeline
- *
- * TOKEN DETECTED → VALIDATION → LIQUIDITY → CREATOR → HOLDERS → FLOW → SAFETY → SCORE → RISK → DECISION
- * Never enter merely because a token is new.
+ * Filter → score → rank. Never invent market data.
  */
 
-import { computeTokenScore } from "@/engines/token-scoring";
-import type { TokenMetrics } from "@/engines/token-scoring";
-import type { TokenScoreBreakdown, RiskLevel } from "@/types";
+import {
+  computeTokenScore,
+  type TokenMetrics,
+  type TokenScoreBreakdown,
+  type RiskLevel,
+} from "@/engines/token-scoring";
 import type { DiscoveredToken } from "@/lib/solana/token-discovery";
 import type { TokenMarketSnapshot } from "@/providers/market-data-provider";
 
@@ -23,9 +24,9 @@ export interface ScannerFilters {
 }
 
 export const DEFAULT_FILTERS: ScannerFilters = {
-  minLiquidityUsd: 10_000,
-  minScore: 70,
-  maxRisk: "MEDIUM",
+  minLiquidityUsd: 3_000,
+  minScore: 55,
+  maxRisk: "HIGH",
   maxAgeMinutes: 1440,
   requireNoMintAuthority: true,
   requireNoFreezeAuthority: true,
@@ -75,15 +76,28 @@ export function analyzeToken(
     priceChange1h: market?.priceChange1h ?? extraMetrics?.priceChange1h ?? null,
   };
 
-  if (metrics.liquidityUsd == null || metrics.liquidityUsd < filters.minLiquidityUsd) {
-    rejectReasons.push(`Liquidity ${metrics.liquidityUsd ?? 0} < min ${filters.minLiquidityUsd}`);
+  if (
+    metrics.liquidityUsd == null ||
+    metrics.liquidityUsd < filters.minLiquidityUsd
+  ) {
+    rejectReasons.push(
+      `Liquidity ${metrics.liquidityUsd ?? 0} < min ${filters.minLiquidityUsd}`
+    );
   }
-  if (filters.maxLiquidityUsd != null && metrics.liquidityUsd != null && metrics.liquidityUsd > filters.maxLiquidityUsd) {
+  if (
+    filters.maxLiquidityUsd != null &&
+    metrics.liquidityUsd != null &&
+    metrics.liquidityUsd > filters.maxLiquidityUsd
+  ) {
     rejectReasons.push(`Liquidity above max ${filters.maxLiquidityUsd}`);
   }
-  if (filters.minVolumeUsd != null && (metrics.volume24hUsd == null || metrics.volume24hUsd < filters.minVolumeUsd)) {
+  if (
+    filters.minVolumeUsd != null &&
+    (metrics.volume24hUsd == null || metrics.volume24hUsd < filters.minVolumeUsd)
+  ) {
     rejectReasons.push("Volume below minimum");
   }
+  // Only reject when authority is known true (null = unknown, do not hard-fail)
   if (filters.requireNoMintAuthority && metrics.hasMintAuthority === true) {
     rejectReasons.push("Mint authority still enabled");
   }
