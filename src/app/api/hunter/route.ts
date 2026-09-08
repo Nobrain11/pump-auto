@@ -1,93 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getCurrentUser, ensureDevUser, createSession } from "@/lib/auth/session";
+import { getHunterState, setHunterState } from "@/lib/hunter/state";
 
 export const dynamic = "force-dynamic";
 
-let localState: {
-  state: string;
-  startedAt: string | null;
-  opportunitiesFound: number;
-  passedFilters: number;
-  positions: number;
-  entriesToday: number;
-  dailyRiskUsedPct: number;
-  marketRegime: string;
-  emergencyStop: boolean;
-} = {
-  state: "OFF",
-  startedAt: null,
-  opportunitiesFound: 0,
-  passedFilters: 0,
-  positions: 0,
-  entriesToday: 0,
-  dailyRiskUsedPct: 0,
-  marketRegime: "UNKNOWN",
-  emergencyStop: false,
-};
-
 export async function GET() {
-  return NextResponse.json({
-    ...localState,
-    note: "Wire to HunterSession table + Redis live state in production worker.",
-  });
+  const state = await getHunterState();
+  return NextResponse.json(state);
 }
 
 const BodySchema = z.object({
-  action: z.enum(["start", "stop", "pause", "resume", "emergency_stop", "clear_emergency"]),
+  action: z.enum([
+    "start",
+    "stop",
+    "pause",
+    "resume",
+    "emergency_stop",
+    "clear_emergency",
+  ]),
 });
 
 export async function POST(req: NextRequest) {
   try {
-    let user = await getCurrentUser();
-    if (!user && process.env.NODE_ENV === "development") {
-      const userId = await ensureDevUser();
-      await createSession(userId);
-      user = await getCurrentUser();
-    }
     const body = await req.json();
     const parsed = BodySchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
+    const current = await getHunterState();
     const { action } = parsed.data;
 
     switch (action) {
-      case "start":
-        if (localState.emergencyStop) {
+      case "start": {
+        if (current.emergencyStop) {
           return NextResponse.json(
             { error: "Emergency stop is active. Clear it before starting." },
             { status: 403 }
           );
         }
-        localState = {
-          ...localState,
-          state: "SCANNING",
-          startedAt: new Date().toISOString(),
-        };
-        break;
+        return NextResponse.json(
+          await setHunterState({
+            state: "SCANNING",
+            startedAt: new Date().toISOString(),
+          })
+        );
+      }
       case "stop":
-        localState = { ...localState, state: "OFF", startedAt: null };
-        break;
+        return NextResponse.json(
+          await setHunterState({ state: "OFF", startedAt: null })
+        );
       case "pause":
-        localState = { ...localState, state: "PAUSED" };
-        break;
-      case "resume":
-        if (localState.emergencyStop) {
-          return NextResponse.json({ error: "Emergency stop is active." }, { status: 403 });
+        return NextResponse.json(await setHunterState({ state: "PAUSED" }));
+      case "resume": {
+        if (current.emergencyStop) {
+          return NextResponse.json(
+            { error: "Emergency stop is active." },
+            { status: 403 }
+          );
         }
-        localState = { ...localState, state: "SCANNING" };
-        break;
+        return NextResponse.json(await setHunterState({ state: "SCANNING" }));
+      }
       case "emergency_stop":
-        localState = { ...localState, state: "RISK_HALTED", emergencyStop: true };
-        break;
+        return NextResponse.json(
+          await setHunterState({ state: "RISK_HALTED", emergencyStop: true })
+        );
       case "clear_emergency":
-        localState = { ...localState, emergencyStop: false, state: "OFF" };
-        break;
+        return NextResponse.json(
+          await setHunterState({ emergencyStop: false, state: "OFF" })
+        );
     }
-
-    return NextResponse.json(localState);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Hunter control failed";
     return NextResponse.json({ error: message }, { status: 500 });
