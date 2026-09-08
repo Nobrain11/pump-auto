@@ -1,5 +1,6 @@
 /**
  * PUMP AUTO — Bot supervisor
+ * scanner + execution + position + optional Telegram
  */
 
 import { createTokenDiscovery } from "@/lib/solana/token-discovery";
@@ -17,6 +18,7 @@ import { prisma } from "@/lib/db/prisma";
 import { Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { Prisma } from "@prisma/client";
+import { telegramLoop, isTelegramEnabled } from "@/lib/telegram/bot";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const SCANNER_MS = Number(process.env.BOT_SCANNER_MS || 20_000);
@@ -281,8 +283,7 @@ async function ensureDatabase() {
       await prisma.$queryRaw`SELECT 1`;
       console.log("[bot] database reachable");
       break;
-    } catch (err) {
-      console.warn(`[bot] waiting for database (${i}/30)`);
+    } catch {
       if (i === 30) process.exit(1);
       await sleep(2000);
     }
@@ -292,7 +293,7 @@ async function ensureDatabase() {
     await prisma.$queryRaw`SELECT 1 FROM "Order" LIMIT 1`;
     console.log("[bot] schema present (Order table found)");
   } catch {
-    console.warn("[bot] tables missing — start script should run prisma db push");
+    console.warn("[bot] tables missing");
   }
 }
 
@@ -303,7 +304,7 @@ async function loop(name: string, fn: () => Promise<unknown>, intervalMs: number
     } catch (err) {
       const msg = err instanceof Error ? redactSecrets(err.message) : String(err);
       if (isSchemaError(err)) {
-        console.error(`[${name}] schema/db issue`, msg.slice(0, 200));
+        console.error(`[${name}] schema/db`, msg.slice(0, 200));
         await sleep(Math.max(intervalMs, 15_000));
         continue;
       }
@@ -317,8 +318,14 @@ async function main() {
   console.log("[bot] PUMP AUTO worker starting");
   await ensureDatabase();
   console.log("[bot] NODE_ENV=", process.env.NODE_ENV);
-  console.log("[bot] intervals scanner/exec/pos", SCANNER_MS, EXECUTION_MS, POSITION_MS);
+  console.log("[bot] intervals", SCANNER_MS, EXECUTION_MS, POSITION_MS);
   console.log("[bot] filters", JSON.stringify(DEFAULT_FILTERS));
+
+  if (isTelegramEnabled()) {
+    telegramLoop().catch((err) => console.error("[telegram] fatal:", err));
+  } else {
+    console.warn("[telegram] disabled — set TELEGRAM_BOT_TOKEN on bot service");
+  }
 
   await Promise.all([
     loop("scanner", scannerTick, SCANNER_MS),
