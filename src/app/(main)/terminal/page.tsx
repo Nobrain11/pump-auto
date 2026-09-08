@@ -19,26 +19,44 @@ interface HunterStatus {
 }
 
 export default function TerminalPage() {
+  const [entered, setEntered] = useState(false);
   const [status, setStatus] = useState<HunterStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [feed, setFeed] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("pump_terminal_entered") === "1") setEntered(true);
+    } catch {
+      /* */
+    }
+  }, []);
+
+  const enterTerminal = () => {
+    setEntered(true);
+    try {
+      sessionStorage.setItem("pump_terminal_entered", "1");
+    } catch {
+      /* */
+    }
+  };
+
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/hunter");
-      const data = await res.json();
-      setStatus(data);
+      setStatus(await res.json());
     } catch {
       setStatus(null);
     }
   }, []);
 
   useEffect(() => {
+    if (!entered) return;
     load();
     const t = setInterval(load, 4000);
     return () => clearInterval(t);
-  }, [load]);
+  }, [entered, load]);
 
   const action = async (act: string) => {
     setLoading(true);
@@ -53,16 +71,10 @@ export default function TerminalPage() {
       if (res.ok) {
         setStatus(data);
         setFeed((f) =>
-          [
-            `${new Date().toLocaleTimeString()}  ${act.toUpperCase()} → ${data.state || "ok"}`,
-            ...f,
-          ].slice(0, 24)
+          [`${new Date().toLocaleTimeString()}  ${act.toUpperCase()} → ${data.state || "ok"}`, ...f].slice(0, 24)
         );
       } else {
         setError(data.error || "Action failed");
-        setFeed((f) =>
-          [`${new Date().toLocaleTimeString()}  ERROR  ${data.error || "failed"}`, ...f].slice(0, 24)
-        );
       }
     } finally {
       setLoading(false);
@@ -71,6 +83,62 @@ export default function TerminalPage() {
 
   const state = status?.state || "OFF";
   const isLive = !["OFF", "PAUSED", "RISK_HALTED", "ERROR"].includes(state);
+
+  if (!entered) {
+    return (
+      <main className="min-h-dvh flex flex-col pb-16 relative overflow-hidden">
+        <div className="hero-glow" aria-hidden />
+        <div className="flex-1 flex flex-col justify-center px-5 max-w-md mx-auto w-full space-y-6 relative z-10">
+          <div className="animate-fade-up">
+            <Brand />
+          </div>
+          <div className="space-y-3 animate-fade-up-delay-1">
+            <span className="hero-tag">
+              <span className="dot dot-live pulse-dot" />
+              Control deck
+            </span>
+            <h1 className="hero-title">
+              Auto-Hunter
+              <br />
+              terminal
+            </h1>
+            <p className="hero-sub">
+              Live control surface for automated entries. Start the hunter, watch
+              filters run, and manage risk. The worker executes only risk-approved
+              orders on Solana.
+            </p>
+          </div>
+          <div className="panel p-3 space-y-2 text-[11px] mono text-[var(--muted)] animate-fade-up-delay-2">
+            <p className="flex justify-between">
+              <span>Scan</span>
+              <span className="text-white">Pump.fun movers</span>
+            </p>
+            <p className="flex justify-between">
+              <span>Filter</span>
+              <span className="text-white">Score · liquidity · risk</span>
+            </p>
+            <p className="flex justify-between">
+              <span>Execute</span>
+              <span className="text-white">Jupiter → Solana</span>
+            </p>
+            <p className="flex justify-between">
+              <span>Stop</span>
+              <span className="text-[var(--warning)]">Emergency blocks new entries</span>
+            </p>
+          </div>
+          <div className="animate-fade-up-delay-3 space-y-2">
+            <Button size="lg" className="btn-shine" onClick={enterTerminal}>
+              Enter terminal
+            </Button>
+            <p className="text-center text-[10px] mono text-[var(--muted)] tracking-wider">
+              FUND · HUNT · TRADE
+            </p>
+          </div>
+        </div>
+        <BottomNav />
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-dvh flex flex-col pb-16">
@@ -86,7 +154,7 @@ export default function TerminalPage() {
         <span className="text-[10px] mono text-[var(--muted)]">{state}</span>
       </header>
 
-      <div className="flex-1 px-4 py-3 max-w-lg mx-auto w-full space-y-3">
+      <div className="flex-1 px-4 py-3 max-w-lg mx-auto w-full space-y-3 animate-fade-in">
         {error && (
           <div className="panel px-3 py-2 text-xs text-[var(--danger)] border-[var(--danger)]/30">
             {error}
@@ -99,7 +167,7 @@ export default function TerminalPage() {
               <p className="label">Auto-Hunter</p>
               <p className="text-xl mono font-semibold text-white">{state}</p>
             </div>
-            <div className="text-right text-[10px] mono text-[var(--muted)] space-y-0.5">
+            <div className="text-right text-[10px] mono text-[var(--muted)]">
               <p>Regime {status?.marketRegime || "—"}</p>
               <p>Risk {status?.dailyRiskUsedPct ?? 0}%</p>
             </div>
@@ -119,56 +187,54 @@ export default function TerminalPage() {
             ))}
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             {!isLive ? (
-              <Button size="sm" onClick={() => action("start")} disabled={loading || status?.emergencyStop}>
-                START
+              <Button
+                size="md"
+                className="btn-shine col-span-2"
+                disabled={loading || status?.emergencyStop}
+                onClick={() => action("start")}
+              >
+                START HUNTER
               </Button>
             ) : (
               <>
-                <Button size="sm" variant="secondary" onClick={() => action("pause")} disabled={loading}>
+                <Button size="md" variant="secondary" disabled={loading} onClick={() => action("pause")}>
                   PAUSE
                 </Button>
-                <Button size="sm" variant="secondary" onClick={() => action("stop")} disabled={loading}>
+                <Button size="md" variant="danger" disabled={loading} onClick={() => action("stop")}>
                   STOP
                 </Button>
               </>
             )}
-            {state === "PAUSED" && (
-              <Button size="sm" onClick={() => action("resume")} disabled={loading}>
-                RESUME
-              </Button>
-            )}
-            <Button size="sm" variant="danger" onClick={() => action("emergency_stop")} disabled={loading}>
-              EMERGENCY
-            </Button>
           </div>
 
-          {status?.emergencyStop && (
-            <div className="rounded border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-2.5 py-2 text-[11px] text-[var(--danger)] flex justify-between items-center">
-              <span>Emergency stop — new entries blocked</span>
-              <button type="button" className="underline" onClick={() => action("clear_emergency")}>
-                Clear
-              </button>
-            </div>
+          {status?.emergencyStop ? (
+            <Button size="sm" variant="outline" className="w-full" onClick={() => action("clear_emergency")}>
+              Clear emergency stop
+            </Button>
+          ) : (
+            <Button size="sm" variant="danger" className="w-full" onClick={() => action("emergency_stop")}>
+              Emergency stop
+            </Button>
           )}
         </section>
 
         <section className="panel overflow-hidden">
-          <div className="panel-header">Execution feed</div>
-          <div className="p-3 font-mono text-[11px] space-y-1 max-h-64 overflow-y-auto min-h-[120px] bg-black/20">
+          <div className="panel-header">Activity feed</div>
+          <div className="max-h-48 overflow-y-auto divide-y divide-[var(--border-subtle)]">
             {feed.length === 0 && (
-              <p className="text-[var(--muted)]">Waiting for commands and system events…</p>
+              <p className="px-3 py-4 text-[11px] text-[var(--muted)] text-center">
+                Actions appear here.
+              </p>
             )}
             {feed.map((line, i) => (
-              <p key={i} className="text-[var(--primary)] leading-relaxed">{line}</p>
+              <p key={i} className="px-3 py-1.5 text-[11px] mono text-white">
+                {line}
+              </p>
             ))}
           </div>
         </section>
-
-        <p className="text-[10px] text-[var(--muted)] text-center leading-relaxed px-2">
-          Emergency stop blocks new automated entries only. Positions and funds are not sold or withdrawn.
-        </p>
       </div>
 
       <BottomNav />
