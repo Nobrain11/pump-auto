@@ -158,10 +158,10 @@ export default function HomePage() {
           <Brand />
           <div className="space-y-2">
             <h1 className="text-xl font-semibold text-white tracking-tight">
-              Solana trading terminal
+              Autonomous Solana command center
             </h1>
             <p className="text-sm text-[var(--muted)] leading-relaxed">
-              Fund → Hunt → Filter → Enter → Watch → Exit. Automated strategies with a mandatory risk engine. Real balances and confirmed transactions only.
+              Observe → Filter → Enter → Monitor → Exit. A signal-first execution layer with hard risk controls. Live balances and confirmed transactions only.
             </p>
           </div>
           <div className="panel p-3 space-y-2 text-[11px] mono text-[var(--muted)]">
@@ -287,7 +287,7 @@ export default function HomePage() {
         <section className="panel p-4 lg:col-span-2">
           <div className="flex justify-between items-start">
             <div>
-              <p className="label">Portfolio</p>
+              <p className="label">Capital overview</p>
               <p className="text-2xl mono font-semibold text-white leading-tight">
                 {(typeof balance === "number" ? balance : portfolio?.totalSol ?? 0).toFixed(4)}{" "}
                 <span className="text-xs text-[var(--muted)]">SOL</span>
@@ -318,7 +318,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className={isLive ? "dot dot-live pulse-dot" : "dot dot-off"} />
-              <h2 className="text-xs font-semibold text-white tracking-wide">AUTO-HUNTER</h2>
+              <h2 className="text-xs font-semibold text-white tracking-wide">SIGNAL ENGINE</h2>
             </div>
             <span className="text-[10px] mono text-[var(--muted)]">{hunterState}</span>
           </div>
@@ -351,7 +351,7 @@ export default function HomePage() {
 
         <section className="panel overflow-hidden lg:col-start-2 lg:row-start-2">
           <div className="panel-header flex justify-between items-center">
-            <span>Activity</span>
+            <span>Signal log</span>
             <Link href="/more/activity" className="text-[var(--primary)] normal-case tracking-normal">All</Link>
           </div>
           <div className="divide-y divide-[var(--border-subtle)] max-h-48 overflow-y-auto">

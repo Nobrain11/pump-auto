@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "PUMP AUTO — Solana Trading Terminal",
-  description: "Fund. Hunt. Trade. Professional Solana automated trading terminal.",
+  title: "ARC//AUTO — Autonomous Solana Command Center",
+  description: "Observe. Filter. Execute. A disciplined command center for automated Solana strategies.",
   icons: { icon: "/favicon.svg" },
   appleWebApp: {
     capable: true,

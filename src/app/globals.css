@@ -1,17 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #07070a;
-  --foreground: #e4e4e7;
-  --card: #0d0d12;
-  --card-elevated: #12121a;
-  --card-border: #1c1c26;
-  --border-subtle: #16161f;
-  --primary: #f5b942;
-  --primary-dim: rgba(245, 185, 66, 0.12);
-  --primary-foreground: #171006;
-  --violet: #8b5cf6;
-  --violet-dim: rgba(139, 92, 246, 0.12);
+  --background: #071012;
+  --foreground: #e5f3f0;
+  --card: #0b1a1d;
+  --card-elevated: #102326;
+  --card-border: #18383a;
+  --border-subtle: #123033;
+  --primary: #48d9b3;
+  --primary-dim: rgba(72, 217, 179, 0.12);
+  --primary-foreground: #041513;
+  --violet: #4db8c4;
+  --violet-dim: rgba(77, 184, 196, 0.12);
   --muted: #71717a;
   --muted-2: #52525b;
   --success: #22c55e;
@@ -48,8 +48,8 @@ body {
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   background-image:
-    linear-gradient(rgba(245, 185, 66, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(245, 185, 66, 0.035) 1px, transparent 1px);
+    linear-gradient(rgba(72, 217, 179, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(72, 217, 179, 0.045) 1px, transparent 1px);
   background-size: 48px 48px;
   background-attachment: fixed;
 }
