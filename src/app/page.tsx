@@ -47,8 +47,10 @@ interface PumpMover {
   mint: string;
   symbol?: string;
   name?: string;
-  score?: { overall?: number };
+  score?: number;
+  risk?: number;
   market?: { priceUsd?: number | null; volume24hUsd?: number | null; liquidityUsd?: number | null } | null;
+  discoveredAt?: string;
   passedFilters?: boolean;
 }
 
@@ -90,7 +92,7 @@ export default function HomePage() {
       ]);
       setHunter(h);
       setActivity((a?.events || a?.activity || []).slice(0, 8));
-      setMovers((s?.passed || []).slice(0, 6));
+        setMovers((s?.opportunities || []).filter((item: PumpMover) => item.passedFilters).slice(0, 6));
       setPortfolio(p);
       setHealth(hl);
     } catch {
@@ -321,27 +323,37 @@ export default function HomePage() {
                 Scanning Pump.fun for the next mover…
               </p>
             )}
-            {movers.map((mover, index) => (
-              <div key={mover.mint} className="rounded-[var(--radius)] border border-[var(--card-border)] bg-[var(--background)] p-3 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{mover.symbol || mover.name || mover.mint.slice(0, 6)}</p>
-                    <p className="text-[10px] mono text-[var(--muted)] truncate">{mover.name || `${mover.mint.slice(0, 5)}…${mover.mint.slice(-4)}`}</p>
+            {movers.map((mover, index) => {
+              const title = mover.symbol || mover.name || `MOVER ${mover.mint.slice(0, 5)}`;
+              const ageMinutes = mover.discoveredAt
+                ? Math.max(1, Math.round((Date.now() - new Date(mover.discoveredAt).getTime()) / 60000))
+                : null;
+              const age = ageMinutes == null ? "—" : ageMinutes < 60 ? `${ageMinutes}m` : `${Math.round(ageMinutes / 60)}h`;
+              const formatUsd = (value?: number | null) => value == null ? "—" : value >= 1000000 ? `$${(value / 1000000).toFixed(1)}M` : `$${(value / 1000).toFixed(1)}K`;
+              return (
+                <div key={mover.mint} className="rounded-[var(--radius)] border border-[var(--card-border)] bg-[var(--background)] p-3 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="size-9 rounded-full bg-[var(--primary)] text-[var(--background)] grid place-items-center text-xs font-bold mono">
+                      {title.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-white truncate">{title}</p>
+                      <p className="text-[10px] mono text-[var(--muted)] truncate">{mover.mint.slice(0, 5)}…{mover.mint.slice(-4)}</p>
+                    </div>
+                    <span className="text-[10px] mono text-[var(--primary)]">#{index + 1}</span>
                   </div>
-                  <span className="text-[10px] mono text-[var(--primary)]">#{index + 1}</span>
+                  <div className="grid grid-cols-3 gap-2 border-t border-[var(--border-subtle)] pt-2 text-[10px] mono">
+                    <div><p className="text-white">{formatUsd(mover.market?.liquidityUsd)}</p><p className="label">liq</p></div>
+                    <div><p className="text-white">{formatUsd(mover.market?.volume24hUsd)}</p><p className="label">vol</p></div>
+                    <div><p className="text-white">{age}</p><p className="label">age</p></div>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] mono">
+                    <span className="text-[var(--muted)]">score {mover.score ?? "—"}</span>
+                    <span className="text-[var(--success)]">risk {mover.risk ?? "—"}</span>
+                  </div>
                 </div>
-                <div className="flex items-end justify-between">
-                  <div>
-                    <p className="text-lg mono font-semibold text-[var(--success)]">{mover.score?.overall ?? "—"}</p>
-                    <p className="label">scan score</p>
-                  </div>
-                  <div className="text-right text-[10px] mono text-[var(--muted)]">
-                    <p>{mover.market?.volume24hUsd ? `$${(mover.market.volume24hUsd / 1000).toFixed(1)}K` : "—"}</p>
-                    <p>24h volume</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 

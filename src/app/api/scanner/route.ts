@@ -40,6 +40,7 @@ export async function GET() {
           liquidityUsd: o.market?.liquidityUsd ?? null,
           volume24hUsd: o.market?.volume24hUsd ?? null,
           priceUsd: o.market?.priceUsd ?? null,
+          discoveredAt: o.discoveredAt,
           passedFilters: o.passedFilters,
           rejectReasons: o.rejectReasons,
           analyzedAt: o.analyzedAt,
