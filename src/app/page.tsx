@@ -43,6 +43,15 @@ interface PortfolioData {
   positionCount?: number;
 }
 
+interface PumpMover {
+  mint: string;
+  symbol?: string;
+  name?: string;
+  score?: { overall?: number };
+  market?: { priceUsd?: number | null; volume24hUsd?: number | null; liquidityUsd?: number | null } | null;
+  passedFilters?: boolean;
+}
+
 export default function HomePage() {
   const [step, setStep] = useState<OnboardingStep>("intro");
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -53,6 +62,7 @@ export default function HomePage() {
   const [showImport, setShowImport] = useState(false);
   const [hunter, setHunter] = useState<HunterStatus | null>(null);
   const [activity, setActivity] = useState<ActivityRow[]>([]);
+  const [movers, setMovers] = useState<PumpMover[]>([]);
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null);
   const [health, setHealth] = useState<{ ok?: boolean } | null>(null);
 
@@ -71,14 +81,16 @@ export default function HomePage() {
 
   const refreshDashboard = useCallback(async () => {
     try {
-      const [h, a, p, hl] = await Promise.all([
+      const [h, a, p, hl, s] = await Promise.all([
         fetch("/api/hunter").then((r) => r.json()).catch(() => null),
         fetch("/api/activity").then((r) => r.json()).catch(() => ({ events: [] })),
         fetch("/api/portfolio").then((r) => r.json()).catch(() => null),
         fetch("/api/health").then((r) => r.json()).catch(() => null),
+        fetch("/api/scanner").then((r) => r.json()).catch(() => ({ passed: [] })),
       ]);
       setHunter(h);
       setActivity((a?.events || a?.activity || []).slice(0, 8));
+      setMovers((s?.passed || []).slice(0, 6));
       setPortfolio(p);
       setHealth(hl);
     } catch {
@@ -342,6 +354,36 @@ export default function HomePage() {
           <Link href="/terminal" className="block">
             <Button size="lg">{isLive ? "Open terminal" : "Start trading"}</Button>
           </Link>
+        </section>
+
+        <section className="panel overflow-hidden">
+          <div className="panel-header flex items-center justify-between">
+            <span>Pump.fun movers</span>
+            <span className="text-[10px] normal-case tracking-normal text-[var(--muted)]">LIVE SCAN</span>
+          </div>
+          <div className="divide-y divide-[var(--border-subtle)]">
+            {movers.length === 0 && (
+              <p className="px-3 py-5 text-[11px] text-[var(--muted)] text-center">
+                No Pump.fun tokens passed the scanner filters yet.
+              </p>
+            )}
+            {movers.map((mover) => (
+              <div key={mover.mint} className="px-3 py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">
+                    {mover.symbol || mover.name || mover.mint.slice(0, 6)}
+                  </p>
+                  <p className="text-[10px] mono text-[var(--muted)] truncate">
+                    {mover.name || `${mover.mint.slice(0, 5)}…${mover.mint.slice(-4)}`}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm mono text-[var(--success)]">{mover.score?.overall ?? "—"}</p>
+                  <p className="text-[10px] text-[var(--muted)]">score</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
 
         <div className="grid grid-cols-2 gap-2">
