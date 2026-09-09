@@ -168,21 +168,31 @@ export default function HomePage() {
       <main className="min-h-dvh flex flex-col pb-16">
         <div className="flex-1 flex flex-col justify-center px-5 max-w-md mx-auto w-full space-y-8">
           <Brand />
-          <div className="space-y-2">
-            <h1 className="text-xl font-semibold text-white tracking-tight">
-              Autonomous Solana command center
+          <div className="space-y-3">
+            <p className="label text-[var(--primary)]">Pump.fun signal desk</p>
+            <h1 className="text-3xl font-semibold text-white tracking-tight text-balance">
+              Find the next mover before the crowd.
             </h1>
             <p className="text-sm text-[var(--muted)] leading-relaxed">
-              Observe → Filter → Enter → Monitor → Exit. A signal-first execution layer with hard risk controls. Live balances and confirmed transactions only.
+              Scan fresh launches, surface real momentum, and let your rules decide what deserves an entry.
             </p>
           </div>
-          <div className="panel p-3 space-y-2 text-[11px] mono text-[var(--muted)]">
-            <p className="flex justify-between"><span>Risk engine</span><span className="text-[var(--success)]">MANDATORY</span></p>
-            <p className="flex justify-between"><span>Mock data</span><span className="text-[var(--danger)]">DISABLED</span></p>
-            <p className="flex justify-between"><span>Keys</span><span className="text-white">AES-256-GCM</span></p>
+          <div className="panel p-3 space-y-3">
+            <div className="flex items-center justify-between text-[10px] mono">
+              <span className="text-[var(--muted)]">PUMP.FUN FEED</span>
+              <span className="text-[var(--success)]">SCANNING LIVE</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[["Fresh launches", "24"], ["Momentum", "+18%"], ["Risk gate", "ON"]].map(([label, value]) => (
+                <div key={label} className="rounded-[var(--radius)] bg-[var(--background)] p-2">
+                  <p className="text-sm mono text-white">{value}</p>
+                  <p className="text-[9px] text-[var(--muted)] mt-1">{label}</p>
+                </div>
+              ))}
+            </div>
           </div>
           <Button size="lg" onClick={() => setStep("terms")}>
-            Continue
+            Start scanning
           </Button>
         </div>
         <BottomNav />
@@ -296,10 +306,49 @@ export default function HomePage() {
       </header>
 
       <div className="flex-1 px-4 py-4 max-w-5xl mx-auto w-full space-y-4 lg:grid lg:grid-cols-[1.15fr_0.85fr] lg:items-start lg:gap-4 lg:space-y-0">
+        <section className="panel p-4 lg:col-span-2 bg-[var(--card)]">
+          <div className="flex items-end justify-between gap-3 mb-4">
+            <div>
+              <p className="label text-[var(--primary)]">Pump.fun radar</p>
+              <h1 className="text-2xl font-semibold text-white tracking-tight">What&apos;s moving now?</h1>
+              <p className="text-xs text-[var(--muted)] mt-1">Fresh launches passing the scan, ranked for momentum.</p>
+            </div>
+            <span className="text-[10px] mono text-[var(--primary)] shrink-0">{movers.length} FOUND</span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {movers.length === 0 && (
+              <p className="sm:col-span-2 lg:col-span-3 py-6 text-[11px] text-[var(--muted)] text-center border border-dashed border-[var(--card-border)] rounded-[var(--radius)]">
+                Scanning Pump.fun for the next mover…
+              </p>
+            )}
+            {movers.map((mover, index) => (
+              <div key={mover.mint} className="rounded-[var(--radius)] border border-[var(--card-border)] bg-[var(--background)] p-3 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white truncate">{mover.symbol || mover.name || mover.mint.slice(0, 6)}</p>
+                    <p className="text-[10px] mono text-[var(--muted)] truncate">{mover.name || `${mover.mint.slice(0, 5)}…${mover.mint.slice(-4)}`}</p>
+                  </div>
+                  <span className="text-[10px] mono text-[var(--primary)]">#{index + 1}</span>
+                </div>
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-lg mono font-semibold text-[var(--success)]">{mover.score?.overall ?? "—"}</p>
+                    <p className="label">scan score</p>
+                  </div>
+                  <div className="text-right text-[10px] mono text-[var(--muted)]">
+                    <p>{mover.market?.volume24hUsd ? `$${(mover.market.volume24hUsd / 1000).toFixed(1)}K` : "—"}</p>
+                    <p>24h volume</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="panel p-4 lg:col-span-2">
           <div className="flex justify-between items-start">
             <div>
-              <p className="label">Capital overview</p>
+              <p className="label">Your capital</p>
               <p className="text-2xl mono font-semibold text-white leading-tight">
                 {(typeof balance === "number" ? balance : portfolio?.totalSol ?? 0).toFixed(4)}{" "}
                 <span className="text-xs text-[var(--muted)]">SOL</span>
@@ -354,36 +403,6 @@ export default function HomePage() {
           <Link href="/terminal" className="block">
             <Button size="lg">{isLive ? "Open terminal" : "Start trading"}</Button>
           </Link>
-        </section>
-
-        <section className="panel overflow-hidden">
-          <div className="panel-header flex items-center justify-between">
-            <span>Pump.fun movers</span>
-            <span className="text-[10px] normal-case tracking-normal text-[var(--muted)]">LIVE SCAN</span>
-          </div>
-          <div className="divide-y divide-[var(--border-subtle)]">
-            {movers.length === 0 && (
-              <p className="px-3 py-5 text-[11px] text-[var(--muted)] text-center">
-                No Pump.fun tokens passed the scanner filters yet.
-              </p>
-            )}
-            {movers.map((mover) => (
-              <div key={mover.mint} className="px-3 py-2.5 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">
-                    {mover.symbol || mover.name || mover.mint.slice(0, 6)}
-                  </p>
-                  <p className="text-[10px] mono text-[var(--muted)] truncate">
-                    {mover.name || `${mover.mint.slice(0, 5)}…${mover.mint.slice(-4)}`}
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-sm mono text-[var(--success)]">{mover.score?.overall ?? "—"}</p>
-                  <p className="text-[10px] text-[var(--muted)]">score</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </section>
 
         <div className="grid grid-cols-2 gap-2">
