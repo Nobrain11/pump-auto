@@ -8,8 +8,8 @@ export function Brand({ compact = false, className }: { compact?: boolean; class
       <img src="/logo.svg" alt="ARC AUTO" className={compact ? "w-6 h-6" : "w-7 h-7"} />
       {!compact && (
         <div className="leading-tight">
-          <p className="text-xs font-semibold tracking-wide text-white">ARC//AUTO</p>
-          <p className="text-[9px] mono text-[var(--muted)] tracking-wider">AUTONOMOUS EXECUTION</p>
+          <p className="text-xs font-semibold tracking-wide text-white">PUMP AUTO</p>
+          <p className="text-[9px] mono text-[var(--primary)] tracking-wider">MEME MARKET AUTOPILOT</p>
         </div>
       )}
     </Link>

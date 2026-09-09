@@ -1,24 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #071012;
-  --foreground: #e5f3f0;
-  --card: #0b1a1d;
-  --card-elevated: #102326;
-  --card-border: #18383a;
-  --border-subtle: #123033;
-  --primary: #48d9b3;
-  --primary-dim: rgba(72, 217, 179, 0.12);
-  --primary-foreground: #041513;
-  --violet: #4db8c4;
-  --violet-dim: rgba(77, 184, 196, 0.12);
-  --muted: #71717a;
-  --muted-2: #52525b;
-  --success: #22c55e;
-  --danger: #ef4444;
-  --warning: #eab308;
-  --info: #38bdf8;
-  --radius: 6px;
+  --background: #0d0d0f;
+  --foreground: #f7f7f2;
+  --card: #171719;
+  --card-elevated: #202023;
+  --card-border: #343438;
+  --border-subtle: #29292d;
+  --primary: #75f0a5;
+  --primary-dim: rgba(117, 240, 165, 0.13);
+  --primary-foreground: #0d0d0f;
+  --violet: #ff8ac6;
+  --violet-dim: rgba(255, 138, 198, 0.12);
+  --muted: #aaa8ae;
+  --muted-2: #6f6d74;
+  --success: #75f0a5;
+  --danger: #ff6b7a;
+  --warning: #ffd166;
+  --info: #8bd3ff;
+  --radius: 14px;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --font-sans: var(--font-geist-sans), system-ui, sans-serif;
 }
@@ -47,10 +47,8 @@ body {
   font-size: 13px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
-  background-image:
-    linear-gradient(rgba(72, 217, 179, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(72, 217, 179, 0.045) 1px, transparent 1px);
-  background-size: 48px 48px;
+  background-image: radial-gradient(rgba(117, 240, 165, 0.16) 1px, transparent 1px);
+  background-size: 22px 22px;
   background-attachment: fixed;
 }
 
@@ -58,6 +56,7 @@ body {
   background: var(--card);
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
 }
 .panel-header {
   padding: 10px 12px;
