@@ -283,8 +283,8 @@ export default function HomePage() {
         </div>
       </header>
 
-      <div className="flex-1 px-4 py-3 max-w-lg mx-auto w-full space-y-3">
-        <section className="panel p-3">
+      <div className="flex-1 px-4 py-4 max-w-5xl mx-auto w-full space-y-4 lg:grid lg:grid-cols-[1.15fr_0.85fr] lg:items-start lg:gap-4 lg:space-y-0">
+        <section className="panel p-4 lg:col-span-2">
           <div className="flex justify-between items-start">
             <div>
               <p className="label">Portfolio</p>
@@ -349,7 +349,7 @@ export default function HomePage() {
           <Link href="/more/smart-devs"><Button variant="secondary" size="md" className="w-full">Smart Devs</Button></Link>
         </div>
 
-        <section className="panel overflow-hidden">
+        <section className="panel overflow-hidden lg:col-start-2 lg:row-start-2">
           <div className="panel-header flex justify-between items-center">
             <span>Activity</span>
             <Link href="/more/activity" className="text-[var(--primary)] normal-case tracking-normal">All</Link>
